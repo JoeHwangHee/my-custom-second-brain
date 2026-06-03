@@ -76,8 +76,10 @@ content_lang: ko
 ```
 
 **ID 규칙**: `{카테고리코드}-{세부}-{날짜}-{순번}`
-- 카테고리코드는 L1 약어 (daily_life → dl, learning → ln 등)
-- ID 접두사만 파싱하면 파일을 읽지 않고 카테고리 판단 가능 (토큰 절감)
+- 카테고리코드는 L1 약어 (정본: `_rules/category_schema.md`의 약어 레지스트리)
+- ID 접두사만 파싱하면 파일을 읽지 않고 **L1** 카테고리 판단 가능 (토큰 절감)
+- 단, ID 접두사는 **L1만 식별**한다. L2 이상의 cross 판정(같은 L1·다른 L2)은 ID로
+  구분 불가하므로 `category_path` 비교로 한다 (storage_rules.md 크로스 카테고리 관계 처리 참조)
 
 ### 3-2. _index.md 헤더
 

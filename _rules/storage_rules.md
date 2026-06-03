@@ -133,9 +133,18 @@ reflective로 분류됐으나 참조할 related 대상을 특정할 수 없으�
 ### 크로스 카테고리 관계 처리
 
 ```
-related: 항목의 대상 파일 ID 접두사를 파싱하여 카테고리 판단
-현재 파일 카테고리코드 ≠ 대상 파일 카테고리코드 → 크로스 카테고리
-→ 해당 레벨 _graph.md에 엣지 추가:
+1차 필터 (저렴): related: 대상 파일 ID 접두사(L1 약어)를 파싱해 현재 파일 L1 약어와 비교.
+  L1 약어 매핑은 category_schema.md의 "L1 카테고리 약어 레지스트리"를 참조한다.
+
+정밀 판정: 양 파일의 category_path를 비교해 기록 레벨을 결정한다.
+  ※ ID 접두사는 L1만 식별하므로 같은 L1·다른 L2 크로스(예: dl-health vs dl-diet)는
+    ID만으로 판단 불가하다. 반드시 category_path로 L2 이하 경계를 비교한다.
+
+  - L1이 다르면        → root /_graph.md 에 기록
+  - 같은 L1·다른 L2면  → 해당 L1의 _graph.md 에 기록
+  - 같은 L2(동일 leaf) → 크로스 아님. 각 파일 related: 섹션으로만 처리(graph 미기록).
+
+→ 결정된 레벨의 _graph.md에 엣지 추가:
   | {from_id} | {to_id} | {edge_type} | {link_strength} |
 ```
 
