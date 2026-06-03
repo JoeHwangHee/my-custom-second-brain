@@ -96,7 +96,9 @@ entry_count: 23
 
 **필드 역할**:
 - `description + keywords + examples`: 3단 캐스케이드 Step 2/3에서 LLM이 카테고리 진입 여부 판단에 사용
-- `entry_count`: Lint 분할 트리거 판단 기준 (50 초과 시 분할 제안)
+- `entry_count`: 해당 카테고리가 **직접 보유한** Thought 파일 수 (하위 누적 아님).
+  중간노드(하위 카테고리만 보유)는 0. Lint 분할 트리거 판단 기준 (leaf entry_count 50 초과 시 분할 제안).
+  Ingest의 +1은 파일이 저장된 leaf _index.md에만 적용.
 - `examples`: 5개 미만 시 Ingest가 자동 보충, Lint가 유효성 검증
 
 ### 3-3. log.md 형식

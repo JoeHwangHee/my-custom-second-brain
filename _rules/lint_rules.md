@@ -30,7 +30,8 @@ Lint 본체는 블로킹 없이 계속 진행한다.
 
 ```
 entry_count 검증:
-  해당 카테고리 내 실제 파일 수 재산정
+  해당 카테고리가 직접 보유한 Thought 파일 수만 재산정 (하위 카테고리 파일 제외)
+  중간노드는 직접 보유 파일이 없으므로 entry_count = 0이 정상
   _index.md의 entry_count와 불일치 시 자동 수정
 
 examples 검증:
@@ -50,7 +51,7 @@ keywords 검증:
 
 ```
 _index.md 분할 조건:
-  entry_count > 50 감지 시:
+  entry_count(직접 보유 파일 수, leaf 기준) > 50 감지 시:
   → _pending.md에 기록:
     - type: split_proposal
       category: {해당 카테고리 경로}

@@ -5,9 +5,18 @@
 
 ---
 
-## Stage 0 — _pending.md 확인 (항상 최우선)
+## Stage 0 — 현재 시각 확보 + _pending.md 확인 (항상 최우선)
 
-대화 시작 시 _pending.md를 먼저 확인한다.
+작업 시작 시 현재 시각을 1회 확보한다.
+
+```
+shell `date '+%Y-%m-%dT%H:%M:%S'` 1회 실행 → 결과를 이번 작업 전체에서 재사용한다.
+용도: log.md timestamp, Thought ID의 날짜부, _lint_status.md 갱신,
+      Lint 트리거 조건 B("현재 시각 − last_lint ≥ 24h") 판단.
+LLM은 현재 시각을 자체적으로 알 수 없으므로 이 확보 없이 timestamp를 추정하지 않는다.
+```
+
+이어서 _pending.md를 확인한다.
 
 ```
 미결 항목 존재 시:

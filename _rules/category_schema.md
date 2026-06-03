@@ -6,6 +6,9 @@
 이 파일은 카테고리 추가/변경 시에만 수동으로 수정한다.
 Ingest / Query / Lint 과정에서 수정 금지.
 
+L1 keywords는 root/index.md의 keywords 컬럼과 동기화 상태를 유지한다.
+이 파일의 L1 keywords를 수정하면 index.md도 함께 갱신한다(둘은 같은 출처여야 한다).
+
 ---
 
 ## 작성 형식
@@ -22,7 +25,7 @@ keywords: [키워드1, 키워드2, ...]   ← Step 1 Keyword Gate 매칭 대상
 
 ## daily_life
 
-keywords: [일상, 생활, 하루, 오늘, 개인, 경험]
+keywords: [일상, 생활, 하루, 오늘, 개인, 경험, 습관, 루틴]
 포함: 개인적인 일상생활 경험, 습관, 루틴, 감정 기록
 제외: 외부 지식, 논문, 체계적 학습 내용 → learning/
 경계: 일상에서 우연히 습득한 정보 → origin: curated, daily_life에 저장
@@ -31,7 +34,7 @@ keywords: [일상, 생활, 하루, 오늘, 개인, 경험]
 
 ## learning
 
-keywords: [학습, 공부, 배움, 지식, 이해, 개념, 원리]
+keywords: [학습, 공부, 배움, 지식, 이해, 개념, 원리, 방법론]
 포함: 의도적으로 학습한 지식, 개념, 원리, 방법론
 제외: 단순 개인 경험, 감정 기록 → daily_life/
 경계: 학습 중 생긴 개인적 감상 → memory_type: reflective, learning에 저장
@@ -44,4 +47,4 @@ keywords: [학습, 공부, 배움, 지식, 이해, 개념, 원리]
 2. 사용자 확인을 거쳐 추가 (자동 생성 금지)
 3. 추가 후 이 파일에 위 형식에 맞춰 기준 명문화
 4. 해당 카테고리 폴더 생성 및 _index.md, _graph.md 초기화
-5. root/index.md에 L1 카테고리 항목 추가
+5. root/index.md에 L1 카테고리 항목 추가 (keywords 컬럼 포함, 이 파일의 keywords와 동일하게)

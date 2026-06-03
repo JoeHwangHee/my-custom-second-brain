@@ -59,6 +59,21 @@ ID 접두사 파싱만으로 카테고리 판단 가능하도록 설계.
 파일을 읽지 않고 크로스 카테고리 여부 판단에 활용.
 ```
 
+### 순번 산정 절차 (필수)
+
+```
+순번은 log.md로 세지 않는다. log.md는 30일 롤오버되므로 과거 순번이 사라져
+카운트가 리셋되고, 같은 날 2건째 저장 시 -001이 재발급되어 기존 파일을 덮어쓴다.
+
+대신 디렉토리를 직접 스캔한다:
+  1. 저장 대상 L2 폴더에서 {카테고리코드}-{세부}-{날짜}-*.md 글롭
+  2. 기존 파일들의 순번 중 최댓값 확인 (없으면 0)
+  3. 신규 순번 = 최댓값 + 1, 3자리 zero-pad (001, 002, ...)
+  4. 생성 직전 동일 ID 파일 부재를 재확인. 존재 시 순번 +1 후 재시도.
+
+원칙: 동일 (카테고리·날짜) 내에서 ID는 절대 재사용/덮어쓰기 하지 않는다.
+```
+
 ### memory_type 결정 기준
 
 ```
@@ -85,6 +100,20 @@ reflective 분류 신호:
 - related의 edge_type: synthesized 사용
 - confidence 기본값: medium
 - tags에 "reflective" 자동 추가
+```
+
+#### related 누락 시 Ingest 시점 강제 (Lint까지 미루지 않음)
+
+```
+reflective로 분류됐으나 참조할 related 대상을 특정할 수 없으면:
+  1. 사용자에게 근거 파일을 요청한다:
+     "이 통찰의 근거가 된 기존 기록을 알려주시겠습니까? (id 또는 주제)"
+  2. 사용자가 제시 → 해당 id로 related 구성 후 저장
+  3. 근거 없음/불명 → reflective로 저장하지 않는다. 둘 중 하나로 처리:
+     - memory_type을 episodic/semantic으로 재분류하여 저장, 또는
+     - _pending.md에 보류 항목으로 기록하고 저장 보류
+       (type: reflective_pending, detected, content 요약)
+원칙: related 없는 reflective 파일을 생성하지 않는다.
 ```
 
 ### link_strength 초기값
@@ -117,7 +146,14 @@ related: 항목의 대상 파일 ID 접두사를 파싱하여 카테고리 판�
 파일 저장 완료 후 해당 카테고리 _index.md를 업데이트한다.
 
 ```
-1. entry_count +1
+entry_count 정의: 해당 카테고리가 직접 보유한 Thought 파일 수.
+  하위 카테고리의 파일은 합산하지 않는다(누적 아님).
+  중간노드(하위 카테고리만 보유)의 entry_count는 0으로 유지된다.
+
+업데이트 대상: Thought 파일이 실제 저장된 leaf _index.md 한 곳만.
+  상위(중간노드) _index.md의 entry_count는 건드리지 않는다.
+
+1. (저장된 leaf의) entry_count +1
 2. examples 항목 수 확인:
    5개 미만 → 새 파일의 title을 examples에 추가
    5개 이상 → 업데이트 없음

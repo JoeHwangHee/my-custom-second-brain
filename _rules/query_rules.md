@@ -11,7 +11,12 @@ _router.md Stage 3의 subject 필드를 쿼리 입력으로 사용한다.
 
 ```
 쿼리 subject에서 키워드 추출
-→ root/index.md의 L1 카테고리 keywords 대조
+→ root/index.md의 keywords 컬럼만으로 L1 대조 (index.md만 로드)
+
+이 단계에서 category_schema.md는 로드하지 않는다.
+index.md keywords는 category_schema.md의 L1 keywords와 동기화되어 있으므로
+경량 index.md만으로 결정론적 라우팅이 닫힌다.
+(category_schema.md는 Step 3 Semantic Judgment에서만 로드.)
 
 단일 매칭:      즉시 해당 경로로 탐색 진입. Step 2, 3 스킵.
 복수 매칭(≤2): Multi-path 탐색 (4항 참고)
@@ -31,8 +36,10 @@ Step 1로 L1 결정 후 하위 레벨 탐색 시 적용
 
 ```
 Step 1, 2로 경로 미결정 시에만 진입
-→ LLM이 후보 _index.md 헤더(description + keywords + examples) 읽고 진입 여부 판단
-→ 판단 불가 시 해당 레벨 _graph.md 크로스 엣지 참조하여 관련 카테고리 후보 확인
+→ 후보 _index.md 헤더(description + keywords + examples) 읽고 진입 여부 판단
+→ L1 경계 판단이 애매하면 이 단계에서만 category_schema.md
+  (포함/제외/경계 기준)를 로드하여 보조 판단
+→ 여전히 판단 불가 시 해당 레벨 _graph.md 크로스 엣지 참조하여 관련 카테고리 후보 확인
 ```
 
 ---
@@ -46,9 +53,12 @@ Semantic 45% 가중치의 실체. 탐색 과정 자체가 의미론적 매칭이
 2. 3단 캐스케이드로 진입 L1 결정
 3. 해당 L1/_index.md 로드 → 하위 카테고리 목록 + 각 description 확인
 4. 3단 캐스케이드로 진입 L2 결정
-5. 최종 타깃 파일 도달 시 중단 (나머지 파일 미로드)
+5. 타깃 카테고리(leaf) 도달 시: 그 안의 후보 파일들을 TEMPR로 순위화해
+   상위 N개 반환. 타깃 경로 밖(다른 L1/L2)의 파일은 로드하지 않는다.
 
-원칙: 필요한 레벨까지만 탐색. 타깃 외 파일 로드 금지.
+원칙: 필요한 레벨까지만 탐색. "중단"은 탐색 경로 확장의 중단이지
+단건 반환이 아니다. 타깃 카테고리 내부는 TEMPR 순위로 복수 반환한다.
+탐색 경로 밖 파일 로드는 금지.
 ```
 
 ---
@@ -74,6 +84,13 @@ Semantic 45% 가중치의 실체. 탐색 과정 자체가 의미론적 매칭이
   _graph.md 크로스 엣지 연결:   0.7
   2홉 연결 (related의 related): 0.4
   연결 없음:                    0.0
+
+  방향성: related: 와 _graph.md 엣지는 단방향 기록이므로 양방향으로 매칭한다.
+    - 직접 링크: 기준 파일의 related: 에 상대 ID가 있거나(정방향),
+      상대 파일의 related: 또는 _graph.md 행에서 기준 파일을 가리키면(역방향) 모두 1.0
+    - _graph.md: from/to 두 컬럼 모두에서 기준 파일을 조회
+  비용 제한: 2홉 판정은 1홉 대상의 related: frontmatter / _graph.md 메타데이터만으로
+    수행한다. 점수 0.4 가산을 위해 Thought 본문을 로드하지 않는다.
 
 [time_score — 10%]
   ≤ 30일:       1.0
@@ -161,6 +178,9 @@ k = 60 (표준값. 상위 랭크 파일의 점수 독점 방지)
 
 accessed_file_ids: 실제 전체 내용이 로드된 파일 ID 목록 (상한 10개)
                    _index.md 탐색 중 스캔만 된 파일은 미포함
+                   10개 초과 로드 시: TEMPR_score 상위 10개만 기록한다.
+                   (하위 순위 파일은 co-occurrence 학습에서 의도적으로 제외 —
+                    상위 연관 쌍 학습을 우선하고 로그 비대화를 방지)
 
 예시: 2026-05-30T09:15:00 | QUERY | 운동 루틴 조회 | dl-health-001,dl-health-003
 ```
