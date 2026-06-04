@@ -100,6 +100,13 @@ _graph.md 분할 처리:
    link_strength = max(base_score, base_score × 0.6 + co_occurrence_score × 0.4)
    co_occurrence_score = min(co_occurrence_count / 20, 1.0)
 5. 변경된 Thought 파일 frontmatter 저장
+6. 해당 쌍이 크로스 카테고리면 _graph.md도 동기 갱신:
+   → 크로스 여부 및 기록 레벨은 storage_rules.md "크로스 카테고리 관계 처리"의
+     category_path 비교 규칙을 따른다(L1 다름→root, 같은 L1·다른 L2→해당 L1).
+   → 결정된 레벨 _graph.md에서 (from_id, to_id) 행을 찾아 link_strength를
+     4번에서 재산정한 값과 동일하게 갱신한다.
+   ※ link_strength가 Thought related:와 _graph.md 두 곳에 이중 저장되므로,
+     이 동기 누락 시 graph 값이 base_score에 고착된다(정합성 결함 방지).
 ```
 
 ### Step 6 — 정합성 점검
