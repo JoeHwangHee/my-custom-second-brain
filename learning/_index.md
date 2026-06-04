@@ -6,3 +6,5 @@ examples: []
 entry_count: 0
 ---
 
+<!-- L1 keywords/description은 정본 _rules/category_schema.md의 파생물 (Lint가 정본 기준 교정) -->
+

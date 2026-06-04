@@ -41,8 +41,13 @@ examples 검증:
   분할 후 편향된 샘플만 남은 경우 LLM이 카테고리 대표 항목으로 재선정
 
 keywords 검증:
-  카테고리 내 파일들의 tags 빈도 집계
+  카테고리 내 파일들의 tags 빈도 집계 (leaf용)
   상위 빈도 태그가 _index.md keywords에 없으면 추가 제안
+
+  L1 keywords/description 정본 대조 (SSOT 사후 수렴):
+    정본은 category_schema.md다. index.md 및 각 L1 _index.md의 L1
+    keywords/description을 정본과 대조해 불일치 시 정본 기준으로 자동 수정한다.
+    (완전 SSOT가 아니라 Lint 시점 사후 수렴 — Query는 파생본을 읽으므로)
 ```
 
 ### Step 3 — 분할 조건 점검

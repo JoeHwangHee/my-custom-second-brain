@@ -8,7 +8,8 @@ Ingest / Query / Lint 과정에서 수정 금지.
 ---
 
 keywords 컬럼은 Query Step 1(Keyword Routing)의 결정론적 매칭 대상이다.
-`_rules/category_schema.md`의 각 L1 keywords와 동기화 상태를 유지한다(카테고리 추가/변경 시 함께 갱신).
+이 표의 L1 keywords/description은 **정본 `_rules/category_schema.md`의 파생물**이다.
+정본 수정 시 함께 갱신하며, Lint Step 2가 정본과 대조해 불일치 시 자동 교정한다.
 
 | 카테고리 | 경로 | 설명 | keywords |
 |---|---|---|---|

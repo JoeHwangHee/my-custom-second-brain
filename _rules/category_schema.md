@@ -6,8 +6,13 @@
 이 파일은 카테고리 추가/변경 시에만 수동으로 수정한다.
 Ingest / Query / Lint 과정에서 수정 금지.
 
-L1 keywords는 root/index.md의 keywords 컬럼과 동기화 상태를 유지한다.
-이 파일의 L1 keywords를 수정하면 index.md도 함께 갱신한다(둘은 같은 출처여야 한다).
+이 파일이 L1 keywords/description의 **정본(SSOT)** 이다.
+root/index.md 및 각 L1 _index.md의 keywords/description은 이 정본의 **파생물**이다.
+정본을 수정하면 파생본을 함께 갱신하며, Lint Step 2가 정본과 대조해 불일치 시 자동 교정한다.
+
+주의(완화이지 완전 SSOT 아님): Query Step 1은 경량 유지를 위해 여전히 파생본(index.md)을
+읽으므로, Lint 사이에는 정본과 어긋나는 창이 남을 수 있다. 이는 lazy-loading을 위한
+의도적 trade-off이며, 정본 교정은 Lint 시점에 사후 수렴한다.
 
 ---
 
