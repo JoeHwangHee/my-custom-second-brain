@@ -123,7 +123,7 @@ reflective 타입은 `related:` 필수, `tags`에 "reflective" 자동 추가.
 - MEMORY.md, _router.md, _rules/*.md 는 어떤 작업에서도 수정하지 않는다
 - 크로스 카테고리 관계만 _graph.md에 저장한다. 동일 카테고리 내 관계는 파일의 `related:` 섹션으로 처리한다
 - 신규 관계(related:) 생성 시 co_occurrence_count = 0, link_strength = base_score로 초기화한다
-- 카테고리 신규 생성은 자동으로 하지 않는다. 사용자 확인 후 생성한다
+- L1 카테고리 신규 생성은 자동으로 하지 않는다. 사용자 확인 후 생성한다. L2 이하 하위 카테고리는 유사도 임계(기존 하위와 75% 미만) 충족 시 자동 생성하고 부모 _index.md 하위목록을 동시 갱신한 뒤 log.md(CATEGORY)로 사후 통지한다
 - log.md에 OTHER 이외의 모든 작업을 기록한다
 
 ---
