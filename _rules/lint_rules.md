@@ -99,7 +99,8 @@ _graph.md 분할 처리:
    예: [A, B, C] → (A,B), (A,C), (B,C)
 3. 각 쌍에 대해:
    → 둘 중 한 파일의 related: 섹션에 상대방 ID 존재 여부 확인
-   → 존재하면 co_occurrence_count +N (해당 쌍이 함께 등장한 세션 수)
+   → 존재하면 co_occurrence_count +N
+     (N = 마지막 LINT 이후 QUERY 엔트리들의 accessed_file_ids에서 두 ID가 함께 나타난 엔트리 수)
    → 존재하지 않으면 스킵 (신규 관계 자동 생성 금지)
 4. co_occurrence_count 업데이트 후 link_strength 재산정:
    link_strength = max(base_score, base_score × 0.6 + co_occurrence_score × 0.4)
