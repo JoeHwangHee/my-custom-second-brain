@@ -11,9 +11,9 @@
 
 ```
 shell `date '+%Y-%m-%dT%H:%M:%S'` 1회 실행 → 결과를 이번 작업 전체에서 재사용한다.
-용도: log.md timestamp, Thought ID의 날짜부, _lint_status.md 갱신,
-      Lint 트리거 조건 B("현재 시각 − last_lint ≥ 24h") 판단.
+용도: log.md timestamp, Thought ID의 날짜부, _lint_status.md 갱신.
 LLM은 현재 시각을 자체적으로 알 수 없으므로 이 확보 없이 timestamp를 추정하지 않는다.
+(Lint 시간 기반 트리거는 폐지됨 — 내부 트리거는 ingest_since_lint ≥ 50뿐)
 ```
 
 이어서 _pending.md를 확인한다.

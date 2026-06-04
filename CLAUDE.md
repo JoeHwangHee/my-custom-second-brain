@@ -70,7 +70,8 @@ _lint_status.md                     (트리거 조건 확인)
 ```
 
 Lint 트리거 조건:
-- `ingest_since_lint ≥ 50` OR 마지막 Lint로부터 24시간 경과
+- 내부 자동: `ingest_since_lint ≥ 50` (유일한 내부 트리거)
+- 주기 정비: 외부 메신저가 일반 Lint 명령("정비해줘")으로 주입 (24h 내부 조건은 제거됨)
 
 ---
 
