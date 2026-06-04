@@ -38,6 +38,7 @@ LLM은 현재 시각을 자체적으로 알 수 없으므로 이 확보 없이 t
 Ingest 확정: "저장해줘", "기록해줘", "추가해줘"
 Query 확정:  "찾아줘", "조회해줘", "보여줘", "검색해줘"
 Lint 확정:   "정비해줘", "점검해줘", "Lint 실행", "정리해줘"
+Delete 확정: "삭제해줘", "지워줘", "삭제"
 ```
 
 ---
@@ -55,6 +56,10 @@ Ingest 확정 패턴:
 Query 확정 패턴:
   - 의문형 + 정보 탐색 의도
   - "뭐가 있어?", "어떻게 ~해?", "~에 대해 알려줘"
+
+Delete 확정 패턴:
+  - 대상 + 제거 의도
+  - "~ 삭제", "~ 지워", "~ 없애"
 ```
 
 ---
@@ -121,4 +126,7 @@ Query 확정  → _rules/query_rules.md
                Stage 3 subject를 쿼리 입력으로 사용
 
 Lint 확정   → _rules/lint_rules.md
+
+Delete 확정 → _rules/storage_rules.md 의 "삭제 핸들러"
+               Stage 3 subject로 삭제 대상 파일을 특정
 ```

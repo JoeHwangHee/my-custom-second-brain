@@ -6,6 +6,7 @@ Append-only. 30일 초과 항목은 Lint가 삭제.
 엔트리 형식:
   {timestamp} | QUERY    | {subject} | {accessed_file_ids}
   {timestamp} | INGEST   | {file_id}
+  {timestamp} | DELETE   | {file_id}
   {timestamp} | CATEGORY | {created_path}
   {timestamp} | LINT     | executed
   {timestamp} | OTHER    | -

@@ -238,3 +238,31 @@ Ingest 1회는 여러 파일을 갱신하므로 부분 실패가 영구화되지
   보정 완료 후 _lint_status.md의 ingest_since_lint ≥ 50이면 사용자에게 Lint 실행을
   안내한다(내부 자동 트리거는 이 조건이 유일하다).
 ```
+
+---
+
+## 7. 삭제 핸들러
+
+_router.md에서 Delete로 확정된 입력을 처리한다. 전체 스캔 없이 대상 파일의
+메타데이터만으로 정합성을 즉시 보정한다(토큰 절감).
+
+```
+1. 삭제 대상 Thought 파일 특정 (Stage 3 subject → id 또는 경로)
+   모호하면 사용자에게 대상 id를 확인한다(잘못된 삭제 방지).
+
+2. 대상 파일 frontmatter만 읽어 category_path와 related: 를 확보.
+
+3. 정합성 보정 (대상 메타데이터 범위 내에서만):
+   a. 해당 leaf _index.md: entry_count −1, examples에 대상 title이 있으면 제거,
+      하위 목록에서 대상 항목 제거
+   b. 대상의 related: 에 적힌 상대 파일들에서 대상 id를 가리키는 역참조 제거
+   c. 대상이 포함된 크로스 엣지: 결정 레벨 _graph.md에서 from/to에 대상 id가 있는 행 제거
+      (레벨 판정은 "크로스 카테고리 관계 처리"의 category_path 비교 규칙 사용)
+
+4. 대상 Thought 파일 삭제.
+
+5. log.md 기록: {timestamp} | DELETE | {file_id}
+```
+
+원칙: 즉시 보정으로 정합성을 닫는다. 누락이 발생해도 Lint Step 6(고아 엣지/깨진 링크
+점검)이 백스톱으로 잔여 불일치를 정리한다.

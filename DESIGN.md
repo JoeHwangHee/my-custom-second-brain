@@ -202,8 +202,8 @@ Lint 재산정: link_strength = max(base_score, base_score × 0.6 + co_occurrenc
 | index.md | 금지 | 금지 | 분할 시만 | 금지 |
 | _index.md | entry_count+1, examples 보충 | 읽기만 | 헤더 정합성 수정 | 금지 |
 | _graph.md | 크로스 엣지 추가 | 읽기만 | 분할 시 수정 | 금지 |
-| log.md | INGEST 기록 | QUERY 기록 | 30일 삭제 | 금지 |
+| log.md | INGEST/CATEGORY/DELETE 기록 | QUERY 기록 | 30일 삭제 | 금지 |
 | _lint_status.md | ingest_since_lint +1 | 금지 | 갱신 | 금지 |
 | _pending.md | 금지 | 금지 | 항목 추가 | 처리 후 삭제 |
 | category_schema.md | 금지 | 금지 | 금지 | 카테고리 추가 시만 |
-| Thought 파일 | 생성 | 읽기만 | frontmatter 수정 | 금지 |
+| Thought 파일 | 생성 | 읽기만 | frontmatter 수정 | 삭제(핸들러) |

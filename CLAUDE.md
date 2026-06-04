@@ -88,7 +88,7 @@ Lint 트리거 조건:
 | log.md | Ingest, Query, Lint (각 이벤트 기록) |
 | _lint_status.md | Ingest (카운트 증가), Lint (갱신) |
 | _pending.md | Lint (항목 추가), 수동 (처리 후 삭제) |
-| Thought 파일 | Ingest (생성), Lint (frontmatter 갱신) |
+| Thought 파일 | Ingest (생성), Delete (삭제 핸들러), Lint (frontmatter 갱신) |
 
 ---
 
