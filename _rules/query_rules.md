@@ -89,6 +89,13 @@ Semantic 45% 가중치의 실체. 탐색 과정 자체가 의미론적 매칭이
     - 직접 링크: 기준 파일의 related: 에 상대 ID가 있거나(정방향),
       상대 파일의 related: 또는 _graph.md 행에서 기준 파일을 가리키면(역방향) 모두 1.0
     - _graph.md: from/to 두 컬럼 모두에서 기준 파일을 조회
+
+  로드 범위 제한 (Lazy Loading 보장):
+    - 후보 집합 내 파일의 frontmatter는 keyword_score 산정을 위해 이미 읽으므로,
+      그 related: 로 정·역방향 직접링크를 판정하는 것은 추가 비용이 없다(무료).
+    - 크로스 역방향은 해당 레벨 _graph.md의 from/to 양 컬럼 조회로 커버한다.
+    - 금지: graph_score 가산만을 위해 후보 집합 "밖" 파일의 본문/frontmatter를
+      신규 로드하지 않는다.
   비용 제한: 2홉 판정은 1홉 대상의 related: frontmatter / _graph.md 메타데이터만으로
     수행한다. 점수 0.4 가산을 위해 Thought 본문을 로드하지 않는다.
 
