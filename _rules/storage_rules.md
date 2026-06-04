@@ -215,3 +215,26 @@ entry_count 정의: 해당 카테고리가 직접 보유한 Thought 파일 수.
 형식: {timestamp} | INGEST | {file_id}
 예시: 2026-05-30T09:20:00 | INGEST | dl-health-20260530-006
 ```
+
+---
+
+## 6. Ingest 완료 self-check (원자성 보장)
+
+Ingest 1회는 여러 파일을 갱신하므로 부분 실패가 영구화되지 않도록, 저장 종료 전
+아래 항목을 명시적으로 점검하고 누락분을 즉시 보정한 뒤 완료를 선언한다.
+
+```
+[ ] Thought 파일 생성 (ID 중복 없음 재확인)
+[ ] leaf _index.md: entry_count +1 / examples 보충(5개 미만 시) / 하위 목록에 항목 추가
+[ ] (L2 자동 생성 시) 부모 중간노드 _index.md 하위 카테고리 목록 반영
+[ ] (크로스 카테고리 시) 결정된 레벨 _graph.md에 엣지 추가
+[ ] _lint_status.md: ingest_since_lint +1
+[ ] log.md: INGEST 기록 (자동 생성 시 CATEGORY 기록도)
+
+위 6개를 모두 확인한 뒤에만 Ingest 완료로 간주한다.
+하나라도 누락 시 해당 파일을 보정하고 재점검한다.
+
+내부 Lint 트리거 진입점:
+  보정 완료 후 _lint_status.md의 ingest_since_lint ≥ 50이면 사용자에게 Lint 실행을
+  안내한다(내부 자동 트리거는 이 조건이 유일하다).
+```
