@@ -3,25 +3,30 @@
 이 디렉토리는 개인 지식 저장소(Second Brain) 시스템이다.
 모든 입력은 아래 절차에 따라 처리한다.
 
+디렉토리는 3계층으로 분리되어 있다(v5.0):
+`_system/`(엔진) · `_rules/`(규칙 — operations/categories/_state) · `memory/`(실메모리).
+`CLAUDE.md`만 루트에 고정된다(자동 로드 부트스트랩).
+
 ---
 
 ## 대화 시작 시 필수 절차 (순서 고정)
 
 ```
-1. _pending.md 확인
+1. _rules/_state/_pending.md 확인
    → 미결 항목 존재 시 사용자에게 먼저 안내
    → 처리 후 원래 의도로 복귀
 
-2. _router.md 로드
+2. _system/router.md 로드
    → 5단계 파이프라인에 따라 입력 의도 분기
 
 3. 의도 확정 후 해당 규칙 파일로 이동
-   Ingest → _rules/storage_rules.md
-   Query  → _rules/query_rules.md
-   Lint   → _lint_status.md 확인 후 _rules/lint_rules.md
+   Ingest → _rules/operations/storage_rules.md
+   Query  → _rules/operations/query_rules.md
+   Delete → _rules/operations/delete_rules.md
+   Lint   → _rules/_state/_lint_status.md 확인 후 _rules/operations/lint_rules.md
 ```
 
-MEMORY.md는 참조가 필요할 때만 로드한다. 대화 시작마다 자동 로드하지 않는다.
+_system/MEMORY.md는 참조가 필요할 때만 로드한다. 대화 시작마다 자동 로드하지 않는다.
 
 ---
 
@@ -30,43 +35,61 @@ MEMORY.md는 참조가 필요할 때만 로드한다. 대화 시작마다 자동
 **Lazy Loading**: 각 단계에서 필요한 파일만 순차 로드한다.
 탐색 중 파일을 미리 로드하거나 불필요한 파일을 읽지 않는다.
 
+**스키마 바인딩**: operation 규칙은 카테고리 스키마 파일명을 직접 박지 않고
+`_rules/categories/_active.md`가 가리키는 "활성 스키마"를 참조한다(스키마 교체는 이 한 곳만).
+
 ---
 
 ## 작업별 파일 로드 순서
 
+실메모리의 물리 루트는 `memory/`다. 아래 `_index.md`/`_graph.md`는 `memory/` 하위 경로 기준.
+
 ### Ingest (저장)
 
 ```
-_router.md
-→ _rules/storage_rules.md
-→ _rules/category_schema.md         (Step 1 Keyword Gate)
-→ 해당 카테고리 _index.md           (Step 2 Tag Gate)
+_system/router.md
+→ _rules/operations/storage_rules.md
+→ 활성 스키마 (_rules/categories/_active.md → category_schema.md)  (Step 1 Keyword Gate)
+→ 해당 카테고리 memory/<cat>/_index.md      (Step 2 Tag Gate)
 → Thought 파일 생성
 → _index.md 업데이트                (entry_count+1, examples 보충)
-→ _graph.md 업데이트                (크로스 카테고리 관계 존재 시)
-→ _lint_status.md 업데이트          (ingest_since_lint +1)
-→ log.md 기록
+→ memory/_graph.md 업데이트         (크로스 카테고리 관계 존재 시)
+→ _rules/_state/_lint_status.md 업데이트  (ingest_since_lint +1)
+→ memory/log.md 기록
 ```
 
 ### Query (조회)
 
 ```
-_router.md
-→ _rules/query_rules.md
-→ index.md                          (L1 카테고리 목록 확인)
-→ 해당 L1/_index.md                 (Step 1 Keyword Routing)
+_system/router.md
+→ _rules/operations/query_rules.md
+→ memory/index.md                   (L1 카테고리 목록 확인)
+→ 해당 memory/<L1>/_index.md        (Step 1 Keyword Routing)
 → 하위 _index.md 순차 탐색          (Step 2 Tag Navigation)
 → 최종 타깃 파일만 로드             (탐색 경로 외 파일 로드 금지)
 → [필요 시] 해당 레벨 _graph.md     (크로스 카테고리 관계 탐색)
-→ log.md 기록
+→ memory/log.md 기록
+```
+
+### Delete (삭제)
+
+```
+_system/router.md
+→ _rules/operations/delete_rules.md
+→ 대상 Thought 파일 frontmatter      (category_path, related: 확보)
+→ memory/<cat>/_index.md            (entry_count −1, examples/목록 정리)
+→ 상대 파일 related: 역참조 제거
+→ memory/_graph.md                  (대상 포함 크로스 엣지 행 제거)
+→ 대상 Thought 파일 삭제
+→ memory/log.md 기록                (DELETE)
 ```
 
 ### Lint (정비)
 
 ```
-_lint_status.md                     (트리거 조건 확인)
+_rules/_state/_lint_status.md       (트리거 조건 확인)
 → 조건 미충족 시: 중단
-→ 조건 충족 시: _rules/lint_rules.md 로드 후 9단계 실행
+→ 조건 충족 시: _rules/operations/lint_rules.md 로드 후 9단계 실행
 ```
 
 Lint 트리거 조건:
@@ -79,17 +102,19 @@ Lint 트리거 조건:
 
 | 파일 | 수정 가능 주체 |
 |---|---|
-| MEMORY.md | 수정 금지 (초기 1회 작성으로 고정) |
-| _router.md | 수정 금지 |
-| _rules/*.md | 수정 금지 |
-| index.md | Lint만 (분할 시) |
-| category_schema.md | 수동만 (새 카테고리 추가 시) |
+| _system/MEMORY.md | 수정 금지 (초기 1회 작성으로 고정) |
+| _system/router.md | 수정 금지 |
+| _system/DESIGN.md / _system/VERIFICATION.md | 수동만 (설계/검증 변경 시) |
+| _rules/operations/*.md | 수정 금지 |
+| _rules/categories/category_schema.md | 수동만 (새 카테고리 추가 시) |
+| _rules/categories/_active.md | 수동만 (활성 스키마 교체 시) |
+| memory/index.md | Lint만 (분할 시) |
 | _index.md | Ingest (entry_count, examples), Lint (헤더 정합성) |
 | _graph.md | Ingest (크로스 엣지 추가), Lint (분할 시) |
-| log.md | Ingest, Query, Lint (각 이벤트 기록) |
-| _lint_status.md | Ingest (카운트 증가), Lint (갱신) |
-| _pending.md | Lint (항목 추가), 수동 (처리 후 삭제) |
-| Thought 파일 | Ingest (생성), Delete (삭제 핸들러), Lint (frontmatter 갱신) |
+| memory/log.md | Ingest, Query, Delete, Lint (각 이벤트 기록) |
+| _rules/_state/_lint_status.md | Ingest (카운트 증가), Lint (갱신) |
+| _rules/_state/_pending.md | Lint (항목 추가), 수동 (처리 후 삭제) |
+| Thought 파일 | Ingest (생성), Delete (삭제), Lint (frontmatter 갱신) |
 
 ---
 
@@ -116,20 +141,21 @@ content_lang: ko
 ```
 
 reflective 타입은 `related:` 필수, `tags`에 "reflective" 자동 추가.
+`category_path`는 `memory/` 하위 논리경로다(예: `daily_life/health`). `memory/` 접두사는 붙이지 않는다.
 
 ---
 
 ## 불변 규칙 요약
 
-- MEMORY.md, _router.md, _rules/*.md 는 어떤 작업에서도 수정하지 않는다
+- _system/MEMORY.md, _system/router.md, _rules/operations/*.md 는 어떤 작업에서도 수정하지 않는다
 - 크로스 카테고리 관계만 _graph.md에 저장한다. 동일 카테고리 내 관계는 파일의 `related:` 섹션으로 처리한다
 - 신규 관계(related:) 생성 시 co_occurrence_count = 0, link_strength = base_score로 초기화한다
-- L1 카테고리 신규 생성은 자동으로 하지 않는다. 사용자 확인 후 생성한다. L2 이하 하위 카테고리는 유사도 임계(기존 하위와 75% 미만) 충족 시 자동 생성하고 부모 _index.md 하위목록을 동시 갱신한 뒤 log.md(CATEGORY)로 사후 통지한다
-- log.md에 OTHER 이외의 모든 작업을 기록한다
+- L1 카테고리 신규 생성은 자동으로 하지 않는다. 사용자 확인 후 생성한다. L2 이하 하위 카테고리는 유사도 임계(기존 하위와 75% 미만) 충족 시 자동 생성하고 부모 _index.md 하위목록을 동시 갱신한 뒤 memory/log.md(CATEGORY)로 사후 통지한다
+- memory/log.md에 OTHER 이외의 모든 작업을 기록한다
 
 ---
 
 ## 전체 설계 레퍼런스
 
-DESIGN.md에 설계 의도, 데이터 형식, 규칙 결정 근거 전체가 기술되어 있다.
+_system/DESIGN.md에 설계 의도, 데이터 형식, 규칙 결정 근거 전체가 기술되어 있다.
 규칙 파일만으로 맥락이 부족할 때 참조한다.

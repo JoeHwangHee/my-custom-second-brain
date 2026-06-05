@@ -1,6 +1,10 @@
 # storage_rules.md — 저장 규칙
 
-_router.md에서 Ingest로 확정된 입력을 처리한다.
+`_system/router.md`에서 Ingest로 확정된 입력을 처리한다.
+
+실메모리의 물리 루트는 `memory/`다. 아래 `_index.md`/`_graph.md`는 `memory/` 하위 경로
+기준의 상대 지칭이며, 카테고리 스키마는 `_rules/categories/_active.md`가 가리키는
+"활성 스키마"를 참조한다(스키마 파일명을 직접 박지 않는다).
 
 ---
 
@@ -10,7 +14,7 @@ _router.md에서 Ingest로 확정된 입력을 처리한다.
 
 ```
 입력 콘텐츠에서 키워드 추출
-→ category_schema.md의 각 카테고리 keywords 목록과 대조
+→ 활성 스키마의 각 카테고리 keywords 목록과 대조
 → 매칭 카테고리 존재 시: 즉시 해당 경로로 저장. Step 2, 3 스킵.
 ```
 
@@ -66,7 +70,7 @@ Step 1, 2 모두 실패 시 진입
         표/섹션이 없으면(예: 비어 있던 learning/_index.md) 섹션을 신설하고 첫 행 기재.
         부모 중간노드의 entry_count는 0으로 유지(불변).
      d. 생성된 leaf에 Thought 파일 저장
-     e. log.md에 CATEGORY 이벤트 기록: {timestamp} | CATEGORY | {created_path}
+     e. memory/log.md에 CATEGORY 이벤트 기록: {timestamp} | CATEGORY | {created_path}
 
 원칙: L1 신규 생성만 사용자 확인. L2 이하는 임계 충족 시 자동 생성 후 log로 사후 통지.
 ```
@@ -141,7 +145,7 @@ reflective로 분류됐으나 참조할 related 대상을 특정할 수 없으�
   2. 사용자가 제시 → 해당 id로 related 구성 후 저장
   3. 근거 없음/불명 → reflective로 저장하지 않는다. 둘 중 하나로 처리:
      - memory_type을 episodic/semantic으로 재분류하여 저장, 또는
-     - _pending.md에 보류 항목으로 기록하고 저장 보류
+     - _rules/_state/_pending.md에 보류 항목으로 기록하고 저장 보류
        (type: reflective_pending, detected, content 요약)
 원칙: related 없는 reflective 파일을 생성하지 않는다.
 ```
@@ -164,13 +168,13 @@ reflective로 분류됐으나 참조할 related 대상을 특정할 수 없으�
 
 ```
 1차 필터 (저렴): related: 대상 파일 ID 접두사(L1 약어)를 파싱해 현재 파일 L1 약어와 비교.
-  L1 약어 매핑은 category_schema.md의 "L1 카테고리 약어 레지스트리"를 참조한다.
+  L1 약어 매핑은 활성 스키마의 "L1 카테고리 약어 레지스트리"를 참조한다.
 
 정밀 판정: 양 파일의 category_path를 비교해 기록 레벨을 결정한다.
   ※ ID 접두사는 L1만 식별하므로 같은 L1·다른 L2 크로스(예: dl-health vs dl-diet)는
     ID만으로 판단 불가하다. 반드시 category_path로 L2 이하 경계를 비교한다.
 
-  - L1이 다르면        → root /_graph.md 에 기록
+  - L1이 다르면        → memory/_graph.md 에 기록
   - 같은 L1·다른 L2면  → 해당 L1의 _graph.md 에 기록
   - 같은 L2(동일 leaf) → 크로스 아님. 각 파일 related: 섹션으로만 처리(graph 미기록).
 
@@ -201,7 +205,7 @@ entry_count 정의: 해당 카테고리가 직접 보유한 Thought 파일 수.
 
 ---
 
-## 4. _lint_status.md 업데이트
+## 4. _rules/_state/_lint_status.md 업데이트
 
 ```
 저장 완료 후: ingest_since_lint +1
@@ -209,7 +213,7 @@ entry_count 정의: 해당 카테고리가 직접 보유한 Thought 파일 수.
 
 ---
 
-## 5. log.md 기록
+## 5. memory/log.md 기록
 
 ```
 형식: {timestamp} | INGEST | {file_id}
@@ -228,41 +232,20 @@ Ingest 1회는 여러 파일을 갱신하므로 부분 실패가 영구화되지
 [ ] leaf _index.md: entry_count +1 / examples 보충(5개 미만 시) / 하위 목록에 항목 추가
 [ ] (L2 자동 생성 시) 부모 중간노드 _index.md 하위 카테고리 목록 반영
 [ ] (크로스 카테고리 시) 결정된 레벨 _graph.md에 엣지 추가
-[ ] _lint_status.md: ingest_since_lint +1
-[ ] log.md: INGEST 기록 (자동 생성 시 CATEGORY 기록도)
+[ ] _rules/_state/_lint_status.md: ingest_since_lint +1
+[ ] memory/log.md: INGEST 기록 (자동 생성 시 CATEGORY 기록도)
 
 위 6개를 모두 확인한 뒤에만 Ingest 완료로 간주한다.
 하나라도 누락 시 해당 파일을 보정하고 재점검한다.
 
 내부 Lint 트리거 진입점:
-  보정 완료 후 _lint_status.md의 ingest_since_lint ≥ 50이면 사용자에게 Lint 실행을
+  보정 완료 후 _rules/_state/_lint_status.md의 ingest_since_lint ≥ 50이면 사용자에게 Lint 실행을
   안내한다(내부 자동 트리거는 이 조건이 유일하다).
 ```
 
 ---
 
-## 7. 삭제 핸들러
+## 7. 삭제 처리 → _rules/operations/delete_rules.md 로 분리됨
 
-_router.md에서 Delete로 확정된 입력을 처리한다. 전체 스캔 없이 대상 파일의
-메타데이터만으로 정합성을 즉시 보정한다(토큰 절감).
-
-```
-1. 삭제 대상 Thought 파일 특정 (Stage 3 subject → id 또는 경로)
-   모호하면 사용자에게 대상 id를 확인한다(잘못된 삭제 방지).
-
-2. 대상 파일 frontmatter만 읽어 category_path와 related: 를 확보.
-
-3. 정합성 보정 (대상 메타데이터 범위 내에서만):
-   a. 해당 leaf _index.md: entry_count −1, examples에 대상 title이 있으면 제거,
-      하위 목록에서 대상 항목 제거
-   b. 대상의 related: 에 적힌 상대 파일들에서 대상 id를 가리키는 역참조 제거
-   c. 대상이 포함된 크로스 엣지: 결정 레벨 _graph.md에서 from/to에 대상 id가 있는 행 제거
-      (레벨 판정은 "크로스 카테고리 관계 처리"의 category_path 비교 규칙 사용)
-
-4. 대상 Thought 파일 삭제.
-
-5. log.md 기록: {timestamp} | DELETE | {file_id}
-```
-
-원칙: 즉시 보정으로 정합성을 닫는다. 누락이 발생해도 Lint Step 6(고아 엣지/깨진 링크
-점검)이 백스톱으로 잔여 불일치를 정리한다.
+Delete 처리 규칙은 `_rules/operations/delete_rules.md`를 참조한다(저장/조회/삭제 대칭 확보).
+삭제 시 크로스 엣지 레벨 판정은 위 "크로스 카테고리 관계 처리"의 category_path 비교 규칙을 따른다.

@@ -1,7 +1,7 @@
-# Second Brain 시스템 설계 v4.0
+# Second Brain 시스템 설계 v5.0
 
 이 문서는 설계 과정에서 결정된 모든 사항을 포함한 완전한 레퍼런스입니다.
-실제 운영 규칙은 각 _rules/ 파일에 기술되어 있으며, 이 문서는 설계 의도와 구조적 맥락을 보존합니다.
+실제 운영 규칙은 각 _rules/operations/ 파일에 기술되어 있으며, 이 문서는 설계 의도와 구조적 맥락을 보존합니다.
 
 구조 결함 정비(#1–#9, G1–G4)의 end-to-end 검증 결과는 `./VERIFICATION.md` 참조.
 
@@ -18,37 +18,55 @@
 
 ---
 
-## 2. 디렉토리 구조
+## 2. 디렉토리 구조 (v5.0 — 3계층)
 
 ```
 second_brain/
-├── MEMORY.md                    ← 정적. 초기 1회 작성 후 수정 금지.
-├── DESIGN.md                    ← 이 파일. 설계 레퍼런스.
+├── CLAUDE.md                       ← 루트 고정 (Claude Code 자동 로드 부트스트랩)
 │
-├── [Schema Layer]
-│   ├── _router.md               ← 5단계 의도 분기
-│   └── _rules/
-│       ├── storage_rules.md     ← 저장 규칙 (3단 캐스케이드)
-│       ├── query_rules.md       ← 조회 규칙 (3단 캐스케이드 + TEMPR + RRF)
-│       ├── lint_rules.md        ← 정비 규칙 (트리거, 점검 항목)
-│       └── category_schema.md  ← 카테고리별 포함/제외/경계 기준
+├── _system/                        ← [Layer 1] 엔진 (불변)
+│   ├── router.md                   ← 5단계 의도 분기
+│   ├── DESIGN.md                   ← 이 파일. 설계 레퍼런스.
+│   ├── VERIFICATION.md             ← end-to-end 검증 결과
+│   └── MEMORY.md                   ← 정적. 초기 1회 작성 후 수정 금지.
 │
-├── [Navigation Infrastructure]
-│   ├── index.md                 ← L1 카테고리 목록만 (경량 유지)
-│   ├── log.md                   ← Append-only, 30일 롤오버
-│   ├── _lint_status.md          ← Lint 트리거 상태 전용
-│   ├── _pending.md              ← 사용자 확인 대기 항목
-│   └── _graph.md                ← L1 간 크로스 엣지만
+├── _rules/                         ← [Layer 2] 규칙
+│   ├── operations/                 ←   조작 규칙 (카테고리 무관 · 재사용 가능)
+│   │   ├── storage_rules.md        ←   저장 규칙 (3단 캐스케이드)
+│   │   ├── query_rules.md          ←   조회 규칙 (3단 캐스케이드 + TEMPR + RRF)
+│   │   ├── delete_rules.md         ←   삭제 규칙 (정합성 즉시 보정)
+│   │   └── lint_rules.md           ←   정비 규칙 (트리거, 점검 항목)
+│   ├── categories/                 ←   카테고리 규칙 (정책/데이터)
+│   │   ├── _active.md              ←   활성 스키마 바인딩 시임
+│   │   └── category_schema.md      ←   카테고리별 포함/제외/경계 기준 (기본 스키마)
+│   └── _state/                     ←   특수사항 (가변 제어 상태)
+│       ├── _lint_status.md         ←   Lint 트리거 상태 전용
+│       └── _pending.md             ←   사용자 확인 대기 항목
 │
-└── [Data Layer]
-    ├── {L1_category}/
-    │   ├── _index.md            ← 헤더 + 하위 목록
-    │   ├── _graph.md            ← 해당 L1 내 L2 간 크로스 엣지
-    │   └── {L2_category}/
-    │       ├── _index.md
-    │       └── *.md             ← Thought 파일
-    └── ...
+└── memory/                         ← [Layer 3] 실메모리
+    ├── index.md                    ←   L1 카테고리 목록만 (경량 유지)
+    ├── log.md                      ←   Append-only, 30일 롤오버
+    ├── _graph.md                   ←   L1 간 크로스 엣지만
+    └── {L1_category}/
+        ├── _index.md               ←   헤더 + 하위 목록
+        ├── _graph.md               ←   해당 L1 내 L2 간 크로스 엣지
+        └── {L2_category}/
+            ├── _index.md
+            └── *.md                ←   Thought 파일
 ```
+
+> **3계층 모델**: 엔진(`_system/`)은 의도 분기와 설계를, 규칙(`_rules/`)은 조작 규칙·카테고리
+> 스키마·가변 상태를, 실메모리(`memory/`)는 데이터를 담는다. operation 규칙(storage/query/
+> delete/lint)은 카테고리 스키마를 `_rules/categories/_active.md`의 "활성 스키마"로 추상 참조하므로,
+> 스키마를 교체해도 operation 규칙은 그대로 재사용된다(관심사 분리 + 조합).
+>
+> **물리 경로 규칙**: `memory/` 내부 파일들의 상호 상대참조는 그대로 유효하다. 물리 접두사
+> `memory/`가 필요한 곳은 `memory/` 바깥(`_system/`·`_rules/`·루트 `CLAUDE.md`)에서 안을
+> 가리키는 참조뿐이다. Thought의 `category_path`와 `_index.md`의 `category:`는 `memory/` 하위
+> 논리경로이며 접두사를 붙이지 않는다(스키마/메모리 재배치에 불변).
+>
+> **향후 확장(이번 범위 제외)**: 스키마별로 분리된 `memory/<schema>/` 서브트리(완전 병행)는
+> 만들지 않는다. 현재는 단일 활성 스키마가 `memory/` 트리와 1:1 매핑된다.
 
 ---
 
@@ -78,10 +96,10 @@ content_lang: ko
 ```
 
 **ID 규칙**: `{카테고리코드}-{세부}-{날짜}-{순번}`
-- 카테고리코드는 L1 약어 (정본: `_rules/category_schema.md`의 약어 레지스트리)
+- 카테고리코드는 L1 약어 (정본: `_rules/categories/category_schema.md`의 약어 레지스트리)
 - ID 접두사만 파싱하면 파일을 읽지 않고 **L1** 카테고리 판단 가능 (토큰 절감)
 - 단, ID 접두사는 **L1만 식별**한다. L2 이상의 cross 판정(같은 L1·다른 L2)은 ID로
-  구분 불가하므로 `category_path` 비교로 한다 (storage_rules.md 크로스 카테고리 관계 처리 참조)
+  구분 불가하므로 `category_path` 비교로 한다 (_rules/operations/storage_rules.md 크로스 카테고리 관계 처리 참조)
 
 ### 3-2. _index.md 헤더
 
@@ -116,7 +134,7 @@ LINT   예시: 2026-05-30T09:25:00 | LINT   | executed
 OTHER  예시: 2026-05-30T09:30:00 | OTHER  | -
 ```
 
-- QUERY 엔트리의 세 번째 필드: _router.md Stage 3에서 정규화된 subject
+- QUERY 엔트리의 세 번째 필드: _system/router.md Stage 3에서 정규화된 subject
 - QUERY 엔트리의 네 번째 필드: 실제 로드된 파일 ID 목록 (상한 10개)
 - 30일 초과 항목은 Lint가 삭제. 단, LINT executed 최근 1건은 영구 보존
 
@@ -140,7 +158,7 @@ ingest_since_lint: 12
 ```
 
 - Lint가 분할 조건 감지 시 여기에 기록 후 블로킹 없이 계속 진행
-- _router.md Stage 0에서 대화 시작마다 확인하여 사용자에게 안내
+- _system/router.md Stage 0에서 대화 시작마다 확인하여 사용자에게 안내
 
 ### 3-6. _graph.md 형식
 
@@ -198,17 +216,18 @@ Lint 재산정: link_strength = max(base_score, base_score × 0.6 + co_occurrenc
 
 | 파일 | Ingest | Query | Lint | 수동 |
 |---|---|---|---|---|
-| MEMORY.md | 금지 | 금지 | 금지 | 초기 1회만 |
-| _router.md | 금지 | 금지 | 금지 | 시스템 변경 시만 |
-| _rules/*.md | 금지 | 금지 | 금지 | 시스템 변경 시만 |
-| index.md | 금지 | 금지 | 분할 시만 | 금지 |
+| _system/MEMORY.md | 금지 | 금지 | 금지 | 초기 1회만 |
+| _system/router.md | 금지 | 금지 | 금지 | 시스템 변경 시만 |
+| _rules/operations/*.md | 금지 | 금지 | 금지 | 시스템 변경 시만 |
+| memory/index.md | 금지 | 금지 | 분할 시만 | 금지 |
 | _index.md | entry_count+1, examples 보충 | 읽기만 | 헤더 정합성 수정 | 금지 |
 | _graph.md | 크로스 엣지 추가 | 읽기만 | 분할 시 수정 | 금지 |
-| log.md | INGEST/CATEGORY/DELETE 기록 | QUERY 기록 | 30일 삭제 | 금지 |
-| _lint_status.md | ingest_since_lint +1 | 금지 | 갱신 | 금지 |
-| _pending.md | 금지 | 금지 | 항목 추가 | 처리 후 삭제 |
-| category_schema.md | 금지 | 금지 | 금지 | 카테고리 추가 시만 |
-| Thought 파일 | 생성 | 읽기만 | frontmatter 수정 | 삭제(핸들러) |
+| memory/log.md | INGEST/CATEGORY/DELETE 기록 | QUERY 기록 | 30일 삭제 | 금지 |
+| _rules/_state/_lint_status.md | ingest_since_lint +1 | 금지 | 갱신 | 금지 |
+| _rules/_state/_pending.md | 금지 | 금지 | 항목 추가 | 처리 후 삭제 |
+| _rules/categories/category_schema.md | 금지 | 금지 | 금지 | 카테고리 추가 시만 |
+| _rules/categories/_active.md | 금지 | 금지 | 금지 | 활성 스키마 교체 시만 |
+| Thought 파일 | 생성 | 읽기만 | frontmatter 수정 | 삭제(delete_rules) |
 
 ---
 

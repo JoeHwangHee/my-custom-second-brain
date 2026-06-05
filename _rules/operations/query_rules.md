@@ -1,7 +1,11 @@
 # query_rules.md — 조회 규칙
 
-_router.md에서 Query로 확정된 입력을 처리한다.
-_router.md Stage 3의 subject 필드를 쿼리 입력으로 사용한다.
+`_system/router.md`에서 Query로 확정된 입력을 처리한다.
+`_system/router.md` Stage 3의 subject 필드를 쿼리 입력으로 사용한다.
+
+실메모리의 물리 루트는 `memory/`다. 아래 `_index.md`/`_graph.md`는 `memory/` 하위 경로
+기준의 상대 지칭이며, 카테고리 스키마는 `_rules/categories/_active.md`가 가리키는
+"활성 스키마"를 참조한다.
 
 ---
 
@@ -11,12 +15,12 @@ _router.md Stage 3의 subject 필드를 쿼리 입력으로 사용한다.
 
 ```
 쿼리 subject에서 키워드 추출
-→ root/index.md의 keywords 컬럼만으로 L1 대조 (index.md만 로드)
+→ memory/index.md의 keywords 컬럼만으로 L1 대조 (memory/index.md만 로드)
 
-이 단계에서 category_schema.md는 로드하지 않는다.
-index.md keywords는 category_schema.md의 L1 keywords와 동기화되어 있으므로
-경량 index.md만으로 결정론적 라우팅이 닫힌다.
-(category_schema.md는 Step 3 Semantic Judgment에서만 로드.)
+이 단계에서 활성 스키마는 로드하지 않는다.
+memory/index.md keywords는 활성 스키마의 L1 keywords와 동기화되어 있으므로
+경량 memory/index.md만으로 결정론적 라우팅이 닫힌다.
+(활성 스키마는 Step 3 Semantic Judgment에서만 로드.)
 
 단일 매칭:      즉시 해당 경로로 탐색 진입. Step 2, 3 스킵.
 복수 매칭(≤2): Multi-path 탐색 (4항 참고)
@@ -37,7 +41,7 @@ Step 1로 L1 결정 후 하위 레벨 탐색 시 적용
 ```
 Step 1, 2로 경로 미결정 시에만 진입
 → 후보 _index.md 헤더(description + keywords + examples) 읽고 진입 여부 판단
-→ L1 경계 판단이 애매하면 이 단계에서만 category_schema.md
+→ L1 경계 판단이 애매하면 이 단계에서만 활성 스키마
   (포함/제외/경계 기준)를 로드하여 보조 판단
 → 여전히 판단 불가 시 해당 레벨 _graph.md 크로스 엣지 참조하여 관련 카테고리 후보 확인
 ```
@@ -49,7 +53,7 @@ Step 1, 2로 경로 미결정 시에만 진입
 Semantic 45% 가중치의 실체. 탐색 과정 자체가 의미론적 매칭이다.
 
 ```
-1. root/index.md 로드 → L1 카테고리 목록 + 각 description 확인
+1. memory/index.md 로드 → L1 카테고리 목록 + 각 description 확인
 2. 3단 캐스케이드로 진입 L1 결정
 3. 해당 L1/_index.md 로드 → 하위 카테고리 목록 + 각 description 확인
 4. 3단 캐스케이드로 진입 L2 결정
@@ -149,7 +153,7 @@ k = 60 (표준값. 상위 랭크 파일의 점수 독점 방지)
 ### 경계 쿼리 보조 (_graph.md 활용)
 
 ```
-탐색 시작 전 root/_graph.md 확인
+탐색 시작 전 memory/_graph.md 확인
 → 쿼리 관련 카테고리에 크로스 엣지가 존재하면
   해당 타깃 카테고리를 Multi-path 후보에 추가
 ```
@@ -162,7 +166,7 @@ k = 60 (표준값. 상위 랭크 파일의 점수 독점 방지)
 관계 탐색 우선순위:
   1. 대상 파일의 related: 섹션 (토큰 최소)
   2. 카테고리 경계 넘는 관계 필요 시 해당 레벨 _graph.md 로드
-  3. L1 간 관계 필요 시에만 root/_graph.md 로드
+  3. L1 간 관계 필요 시에만 memory/_graph.md 로드
 
 원칙: 필요한 레벨까지만 올라가는 지연 탐색
 ```
@@ -178,7 +182,7 @@ k = 60 (표준값. 상위 랭크 파일의 점수 독점 방지)
 
 ---
 
-## 7. log.md 기록
+## 7. memory/log.md 기록
 
 ```
 형식: {timestamp} | QUERY | {subject} | {accessed_file_ids}

@@ -1,10 +1,14 @@
 # lint_rules.md — 정비 규칙
 
+실메모리의 물리 루트는 `memory/`다. 아래 `_index.md`/`_graph.md`는 `memory/` 하위 경로
+기준의 상대 지칭이며, 카테고리 스키마는 `_rules/categories/_active.md`가 가리키는
+"활성 스키마"를 참조한다.
+
 ---
 
 ## 1. 트리거 조건
 
-_lint_status.md를 읽어 아래 내부 조건 충족 시 실행한다.
+`_rules/_state/_lint_status.md`를 읽어 아래 내부 조건 충족 시 실행한다.
 
 ```
 내부 자동 조건: ingest_since_lint ≥ 50  (유일한 내부 트리거)
@@ -20,7 +24,7 @@ _lint_status.md를 읽어 아래 내부 조건 충족 시 실행한다.
 ### Step 1 — _pending.md 미결 항목 안내
 
 ```
-_pending.md에 항목이 존재하면 사용자에게 먼저 안내한다.
+_rules/_state/_pending.md에 항목이 존재하면 사용자에게 먼저 안내한다.
 Lint 본체는 블로킹 없이 계속 진행한다.
 ```
 
@@ -45,19 +49,19 @@ keywords 검증:
   상위 빈도 태그가 _index.md keywords에 없으면 추가 제안
 
   L1 keywords/description 정본 대조 (SSOT 사후 수렴):
-    정본은 category_schema.md다. index.md 및 각 L1 _index.md의 L1
+    정본은 활성 스키마다. memory/index.md 및 각 L1 _index.md의 L1
     keywords/description을 정본과 대조해 불일치 시 정본 기준으로 자동 수정한다.
     (완전 SSOT가 아니라 Lint 시점 사후 수렴 — Query는 파생본을 읽으므로)
 ```
 
 ### Step 3 — 분할 조건 점검
 
-블로킹 없이 조건 감지 시 _pending.md에 기록 후 계속 진행한다.
+블로킹 없이 조건 감지 시 _rules/_state/_pending.md에 기록 후 계속 진행한다.
 
 ```
 _index.md 분할 조건:
   entry_count(직접 보유 파일 수, leaf 기준) > 50 감지 시:
-  → _pending.md에 기록:
+  → _rules/_state/_pending.md에 기록:
     - type: split_proposal
       category: {해당 카테고리 경로}
       detected: {현재 시각}
@@ -65,7 +69,7 @@ _index.md 분할 조건:
 
 _graph.md 분할 조건:
   항목 수 > 100 감지 시:
-  → _pending.md에 기록:
+  → _rules/_state/_pending.md에 기록:
     - type: graph_split_proposal
       level: {해당 _graph.md 경로}
       detected: {현재 시각}
@@ -73,7 +77,7 @@ _graph.md 분할 조건:
 
 ### Step 4 — 분할 승인 후 처리
 
-사용자가 _pending.md 항목을 승인한 경우에만 실행한다.
+사용자가 _rules/_state/_pending.md 항목을 승인한 경우에만 실행한다.
 
 ```
 _index.md 분할 처리:
@@ -83,7 +87,7 @@ _index.md 분할 처리:
   4. 상위 _index.md는 하위 카테고리 목록 + 한 줄 설명만 유지
   5. 이관된 Thought 파일들의 category_path 필드 새 경로로 일괄 업데이트
   6. 해당 레벨 _graph.md의 경로 참조 수정
-  7. log.md에 split_reconciled 이벤트 기록
+  7. memory/log.md에 split_reconciled 이벤트 기록
 
 _graph.md 분할 처리:
   1. 엣지를 출발 노드의 카테고리 기준으로 클러스터링
@@ -94,7 +98,7 @@ _graph.md 분할 처리:
 ### Step 5 — link_strength 재산정
 
 ```
-1. log.md에서 마지막 LINT executed 이후 QUERY 엔트리만 추출
+1. memory/log.md에서 마지막 LINT executed 이후 QUERY 엔트리만 추출
 2. 각 QUERY 엔트리의 accessed_file_ids에서 모든 쌍(pair) 생성
    예: [A, B, C] → (A,B), (A,C), (B,C)
 3. 각 쌍에 대해:
@@ -107,8 +111,8 @@ _graph.md 분할 처리:
    co_occurrence_score = min(co_occurrence_count / 20, 1.0)
 5. 변경된 Thought 파일 frontmatter 저장
 6. 해당 쌍이 크로스 카테고리면 _graph.md도 동기 갱신:
-   → 크로스 여부 및 기록 레벨은 storage_rules.md "크로스 카테고리 관계 처리"의
-     category_path 비교 규칙을 따른다(L1 다름→root, 같은 L1·다른 L2→해당 L1).
+   → 크로스 여부 및 기록 레벨은 _rules/operations/storage_rules.md "크로스 카테고리 관계 처리"의
+     category_path 비교 규칙을 따른다(L1 다름→memory/_graph.md, 같은 L1·다른 L2→해당 L1).
    → 결정된 레벨 _graph.md에서 (from_id, to_id) 행을 찾아 link_strength를
      4번에서 재산정한 값과 동일하게 갱신한다.
    ※ link_strength가 Thought related:와 _graph.md 두 곳에 이중 저장되므로,
@@ -133,21 +137,21 @@ _graph.md 분할 처리:
     참조하는 행 제거 (수동 삭제 시 즉시 보정 누락분의 백스톱)
 ```
 
-### Step 7 — log.md 정리
+### Step 7 — memory/log.md 정리
 
 ```
 30일 초과 항목 삭제
 단, LINT executed 항목 중 가장 최근 1건은 날짜와 무관하게 보존
 ```
 
-### Step 8 — _lint_status.md 갱신
+### Step 8 — _rules/_state/_lint_status.md 갱신
 
 ```
 last_lint: {현재 시각}
 ingest_since_lint: 0
 ```
 
-### Step 9 — log.md 기록
+### Step 9 — memory/log.md 기록
 
 ```
 형식: {timestamp} | LINT | executed

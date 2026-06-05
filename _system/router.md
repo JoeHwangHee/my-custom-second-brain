@@ -1,4 +1,4 @@
-# _router.md — 의도 분기 파이프라인
+# router.md — 의도 분기 파이프라인
 
 모든 입력은 이 파일의 5단계를 순서대로 거쳐 작업 유형이 결정된다.
 의도 확정 후 해당 규칙 파일로 이동한다.
@@ -11,12 +11,12 @@
 
 ```
 shell `date '+%Y-%m-%dT%H:%M:%S'` 1회 실행 → 결과를 이번 작업 전체에서 재사용한다.
-용도: log.md timestamp, Thought ID의 날짜부, _lint_status.md 갱신.
+용도: memory/log.md timestamp, Thought ID의 날짜부, _rules/_state/_lint_status.md 갱신.
 LLM은 현재 시각을 자체적으로 알 수 없으므로 이 확보 없이 timestamp를 추정하지 않는다.
 (Lint 시간 기반 트리거는 폐지됨 — 내부 트리거는 ingest_since_lint ≥ 50뿐)
 ```
 
-이어서 _pending.md를 확인한다.
+이어서 `_rules/_state/_pending.md`를 확인한다.
 
 ```
 미결 항목 존재 시:
@@ -108,7 +108,7 @@ Stage 3에서 Mixed 판정 시 적용된다.
 
 ```
 지식베이스와 무관한 일반 대화로 판단:
-  → 라우팅 없이 일반 응답 반환, log.md에 OTHER 기록
+  → 라우팅 없이 일반 응답 반환, memory/log.md에 OTHER 기록
 
 판단 불가:
   → 사용자에게 확인: "저장하시겠습니까, 조회하시겠습니까?"
@@ -119,14 +119,14 @@ Stage 3에서 Mixed 판정 시 적용된다.
 ## 의도 확정 후 이동
 
 ```
-Ingest 확정 → _rules/storage_rules.md
+Ingest 확정 → _rules/operations/storage_rules.md
                Stage 3 subject를 저장 대상 주제로 사용
 
-Query 확정  → _rules/query_rules.md
+Query 확정  → _rules/operations/query_rules.md
                Stage 3 subject를 쿼리 입력으로 사용
 
-Lint 확정   → _rules/lint_rules.md
+Lint 확정   → _rules/operations/lint_rules.md
 
-Delete 확정 → _rules/storage_rules.md 의 "삭제 핸들러"
+Delete 확정 → _rules/operations/delete_rules.md
                Stage 3 subject로 삭제 대상 파일을 특정
 ```
