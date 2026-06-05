@@ -7,8 +7,9 @@ end-to-end 실행해 데이터 정합성이 닫히는지 검증한 결과를 기
   규칙대로 생성·수정하며 워크스루. 검증 후 데이터는 폐기, 규칙 변경분만 main에 유지.
 - 검증 일자: 2026-06-04
 - 정비 커밋: main `#2 … #9` (9개 커밋, 결함별 1커밋)
-- 대상 규칙 파일: `_router.md`, `_rules/*.md`, `CLAUDE.md`, `DESIGN.md`,
-  `index.md`/`_index.md`, `_graph.md`, `log.md`, `_lint_status.md` (`MEMORY.md`는 미수정)
+- 대상 규칙 파일(경로는 v5.0 재배치 기준 표기): `_system/router.md`, `_rules/operations/*.md`,
+  `CLAUDE.md`, `_system/DESIGN.md`, `memory/index.md`/`_index.md`, `_graph.md`, `memory/log.md`,
+  `_rules/_state/_lint_status.md` (`_system/MEMORY.md`는 미수정)
 
 ---
 
@@ -22,7 +23,7 @@ end-to-end 실행해 데이터 정합성이 닫히는지 검증한 결과를 기
 | 4. Lint 트리거 | `ingest_since_lint=3<50` 상태 + 명시적 "정비해줘" | #6, **G4** | 내부 자동 트리거 미발동(24h 조건 폐지), 명시적 명령으로만 Lint 실행. **PASS** |
 | 5. SSOT 수렴 | `index.md` L1 keywords 고의 훼손 후 Lint | #4 | 정본 `category_schema.md` 대조→불일치 감지→정본 기준 자동 교정. **PASS** |
 | 6. graph_score 로드범위 | 규칙 동작 | **G3**, #8 | "후보 밖 파일 신규 로드 금지" 규칙 반영. 후보 내 frontmatter로 정·역방향 무료 판정. **PASS** |
-| 7. 상호참조 grep | 전수 | 전체 | `세션 수` 0건, `_router.md` Delete 분기 3곳, `24h`는 "폐지" 설명 맥락만. **PASS** |
+| 7. 상호참조 grep | 전수 | 전체 | `세션 수` 0건, `_system/router.md` Delete 분기 3곳, `24h`는 "폐지" 설명 맥락만. **PASS** |
 
 ---
 
@@ -35,3 +36,23 @@ end-to-end 실행해 데이터 정합성이 닫히는지 검증한 결과를 기
 - **#9**: `co_occurrence_count`를 "함께 조회된 엔트리 수"로 계산하는 정의가 실데이터에서 적용됨.
 
 전체 설계 의도와 규칙 결정 근거는 `DESIGN.md` 참조.
+
+---
+
+## v5.0 3계층 마이그레이션 검증 (2026-06-06)
+
+3계층 재구조화(`_system/` · `_rules/{operations,categories,_state}` · `memory/`) + 삭제 규칙
+추출(`delete_rules.md`) + 카테고리 스키마 바인딩 시임(`_rules/categories/_active.md`) 적용 후
+end-to-end 검증.
+
+| 검증 | 방법 | 결과 |
+|---|---|---|
+| 이동 무결성 | `git status` | 옮긴 파일 전부 `R`(rename) 추적, 데이터 손실 0. **PASS** |
+| 잔존 옛 경로 스윕 | grep 8패턴 × (CLAUDE.md, _system/, _rules/, memory/) | 0건. (초기 2건 — `_pending.md`의 `_router.md` 참조, storage §7 "삭제 핸들러" 명칭 — 교정 후 0건.) **PASS** |
+| 신규 트리 실재 | `find` | 목표 3계층 전 파일 + `delete_rules.md`·`_active.md` 존재. **PASS** |
+| 파이프라인 드라이런 | Ingest/Query/Delete/Lint 로드순서 경로 실재 | 12개 경로 전부 실재. **PASS** |
+| 라우팅 회귀 | `router.md` "의도 확정 후 이동" | 4분기 새 경로 도달. **Delete→delete_rules.md 직접**(우회 제거), storage/query/lint 전부 "활성 스키마" 경유. **PASS** |
+| CLAUDE.md 부트스트랩 | 루트 잔류 + 내부 경로 | 루트 고정 유지, `_system/CLAUDE.md` 미존재, 내부 옛 경로 0건. **PASS** |
+
+핵심: 데이터 트리(`memory/`)는 이동만 되고 논리 `category_path`/`category:`는 불변. operation 규칙은
+카테고리 스키마를 `_active.md`로 추상 참조하여 스키마 교체 시 operation 무수정 재사용이 가능하다.

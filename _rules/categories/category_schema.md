@@ -3,14 +3,18 @@
 각 L1 카테고리의 포함/제외/경계 기준을 명문화한다.
 3단 캐스케이드 Step 1의 키워드 매칭 및 Step 3의 LLM 판단 기준으로 사용된다.
 
+이 파일은 `_rules/categories/_active.md`가 가리키는 **활성 스키마 중 하나(기본값)**다.
+operation 규칙(storage/query/lint)은 이 파일명을 직접 박지 않고 `_active.md`의 active_schema를
+통해 "활성 스키마"로 참조한다. 스키마 교체는 `_active.md` 한 곳만 바꾼다.
+
 이 파일은 카테고리 추가/변경 시에만 수동으로 수정한다.
 Ingest / Query / Lint 과정에서 수정 금지.
 
 이 파일이 L1 keywords/description의 **정본(SSOT)** 이다.
-root/index.md 및 각 L1 _index.md의 keywords/description은 이 정본의 **파생물**이다.
+memory/index.md 및 각 L1 _index.md의 keywords/description은 이 정본의 **파생물**이다.
 정본을 수정하면 파생본을 함께 갱신하며, Lint Step 2가 정본과 대조해 불일치 시 자동 교정한다.
 
-주의(완화이지 완전 SSOT 아님): Query Step 1은 경량 유지를 위해 여전히 파생본(index.md)을
+주의(완화이지 완전 SSOT 아님): Query Step 1은 경량 유지를 위해 여전히 파생본(memory/index.md)을
 읽으므로, Lint 사이에는 정본과 어긋나는 창이 남을 수 있다. 이는 lazy-loading을 위한
 의도적 trade-off이며, 정본 교정은 Lint 시점에 사후 수렴한다.
 
@@ -74,15 +78,15 @@ L1과 L2 이하는 절차가 다르다.
 3. 약어 레지스트리에 `경로 → 약어` 등록 + 충돌 검사 (위 "L1 카테고리 약어 레지스트리")
 4. 추가 후 이 파일에 위 형식에 맞춰 기준 명문화
 5. 해당 카테고리 폴더 생성 및 _index.md, _graph.md 초기화
-6. root/index.md에 L1 카테고리 항목 추가 (keywords 컬럼 포함, 이 파일의 keywords와 동일하게)
+6. memory/index.md에 L1 카테고리 항목 추가 (keywords 컬럼 포함, 이 파일의 keywords와 동일하게)
 
 ### L2 이하 신규 추가 (자동 · 사후 통지)
 
-storage_rules.md "Step 4 — leaf 도달 및 L2 이하 자동 생성"이 처리한다.
+_rules/operations/storage_rules.md "Step 4 — leaf 도달 및 L2 이하 자동 생성"이 처리한다.
 
 1. 기존 하위와 유사도 75% 미만일 때만 자동 신설 (사용자 확인 불필요)
 2. 판단 기준은 이 파일이 아니라 각 _index.md 헤더(description/keywords)다 (L2 이하는
    여기에 명문화하지 않는다)
 3. 폴더 + leaf _index.md(entry_count: 0) 생성, 필요 시 _graph.md 초기화
 4. 부모(중간노드) _index.md "## 하위 카테고리" 목록에 신규 leaf 행 추가 (없으면 섹션 신설)
-5. log.md에 CATEGORY 이벤트 기록
+5. memory/log.md에 CATEGORY 이벤트 기록
