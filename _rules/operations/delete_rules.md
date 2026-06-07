@@ -14,7 +14,7 @@
 2. 대상 파일 frontmatter만 읽어 category_path(인지유형)와 related: 를 확보.
 
 3. 정합성 보정 (대상 메타데이터 범위 내에서만):
-   a. 해당 인지유형 memory/{type}/_index.md: entry_count −1, 목록에서 대상 항목 제거.
+   a. 통계(entry_count/examples)는 Lint가 memory/index.md에 재산정한다 — Delete는 통계를 건드리지 않는다.
    b. 대상의 related: 에 적힌 상대 파일들에서 대상 id를 가리키는 역참조 제거.
    c. 다른 인지유형 간 크로스 엣지: memory/_graph.md 에서 from/to 에 대상 id가 있는 행 제거.
       (flat 구조라 크로스는 항상 루트 _graph.md 한 곳.)

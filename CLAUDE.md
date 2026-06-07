@@ -49,7 +49,7 @@ _system/MEMORY.md는 참조가 필요할 때만 로드한다.
 
 ## 작업별 파일 로드 순서
 
-실메모리의 물리 루트는 `memory/`다. 폴더는 인지유형당 flat(L2 토픽 폴더 없음).
+실메모리의 물리 루트는 `memory/`다. 모든 Thought는 `memory/` 직속에 둔다(폴더 없음; 인지유형은 `category_path`로 식별).
 
 ### Ingest (저장)
 ```
@@ -59,7 +59,7 @@ _system/router.md → _rules/operations/storage_rules.md
 → 활성 edge 스키마(_rules/edges/_active.md)로 related link_strength 초기화
 → node tools/index.mjs --file <경로>   (실패 시 _pending reindex_pending)
 → node tools/query.mjs --related <경로> → 관계후보 검토 → edge_type 선택 연결
-→ 해당 인지유형 _index.md entry_count+1 / (다른 인지유형 간) memory/_graph.md 엣지
+→ (다른 인지유형 간) memory/_graph.md 엣지  (통계는 Lint가 memory/index.md에 재산정)
 → _rules/_state/_lint_status.md ingest_since_lint+1 → memory/log.md INGEST
 ```
 
@@ -75,7 +75,7 @@ _system/router.md → _rules/operations/query_rules.md
 ### Delete (삭제)
 ```
 _system/router.md → _rules/operations/delete_rules.md
-→ 대상 frontmatter(category_path, related) → _index.md entry_count−1 / 역참조 / _graph.md 정리
+→ 대상 frontmatter(category_path, related) → 역참조 / _graph.md 정리  (통계는 Lint)
 → 파일 삭제 → node tools/index.mjs --prune → memory/log.md DELETE
 ```
 
@@ -99,8 +99,7 @@ _rules/_state/_lint_status.md (트리거: ingest_since_lint≥50 또는 명시 �
 | _rules/categories/category_schema.md, _active.md | 수동만 |
 | _rules/edges/edge_schema.md, _active.md | 수동만 (edge 온톨로지 변경 시) |
 | tools/** (코드) | 수동만 (CLI 변경 시). tools/.index/ 는 CLI가 생성(파생물) |
-| memory/index.md | 수동만 (인지유형 추가 시) |
-| memory/{type}/_index.md | Ingest (entry_count, 목록), Lint (entry_count·examples centroid) |
+| memory/index.md | 수동 (인지유형 목록), Lint (통계 섹션 entry_count·examples 자동 갱신) |
 | memory/_graph.md | Ingest (크로스 엣지), Lint |
 | memory/log.md | Ingest/Query/Delete/Lint (각 이벤트) |
 | _rules/_state/_lint_status.md | Ingest (카운트+1), Lint (갱신) |

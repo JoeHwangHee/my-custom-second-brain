@@ -29,7 +29,8 @@ thesis    : 명시적 주장·입장·평가 ("~해야 한다", "~라고 본다"
   (다른 인지유형 간이므로 `memory/_graph.md`에도 기록).
 - 애매하면 지배적 신호로 단일 분류한다.
 
-주제(운동·식단 등)는 L1이 아니라 `tags`로 기록한다. 폴더는 인지유형당 flat(L2 토픽 폴더 없음).
+주제(운동·식단 등)는 L1이 아니라 `tags`로 기록한다. 모든 Thought는 `memory/` 직속에 저장하며
+(폴더 없음), 인지유형은 `category_path`로 식별한다.
 
 ---
 
@@ -59,7 +60,8 @@ content_lang: ko
 ```
 형식: {인지유형약어}-{YYYYMMDD}-{순번}
 약어: 활성 스키마 약어 레지스트리 (episodic→ep, semantic→se, procedural→pr, reflective→rf, thesis→th)
-순번 산정: 해당 인지유형 폴더에서 글롭 `{약어}-{날짜}-*.md`의 순번 최댓값 + 1, 3자리 zero-pad.
+순번 산정: memory/ 직속에서 글롭 `{약어}-{날짜}-*.md`의 순번 최댓값 + 1, 3자리 zero-pad.
+  (약어가 인지유형을 식별하므로 flat에서도 폴더 없이 충돌 없음)
   생성 직전 동일 ID 부재 재확인. 존재 시 +1 재시도. (덮어쓰기 금지)
 ID 접두사 파싱만으로 L1=인지유형 식별(토큰 절감).
 ```
@@ -92,11 +94,10 @@ top-k 유사 후보를 받아 related 후보로 검토한다. LLM은 후보별 e
 
 ---
 
-## 3. _index.md 업데이트
+## 3. 통계 (Lint 전담)
 ```
-저장된 인지유형 memory/{type}/_index.md:
-  entry_count +1, 새 파일 항목을 목록에 추가.
-  (examples/entry_count 정합은 Lint가 centroid로 재산정 — tools/lint.mjs --apply)
+flat 구조에서 entry_count/examples는 순수 파생 통계다. Ingest는 통계를 건드리지 않는다.
+Lint(tools/lint.mjs --apply)가 memory/index.md 통계 섹션을 centroid로 재산정한다.
 ```
 
 ---
@@ -126,7 +127,6 @@ memory/log.md: {timestamp} | INGEST | {file_id}   (분해 저장 시 각 id, 자
 ```
 [ ] Thought 파일 생성 (ID 중복 없음 재확인)
 [ ] (다중신호) 분해 저장 + reflective→episodic synthesized 연결(+_graph.md)
-[ ] leaf _index.md: entry_count +1 / 목록 추가
 [ ] (다른 인지유형 간) memory/_graph.md 엣지 추가
 [ ] node tools/index.mjs --file 호출 (실패 시 reindex_pending 기록)
 [ ] node tools/query.mjs --related 로 관계후보 검토 → edge_type 선택 연결

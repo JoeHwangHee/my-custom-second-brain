@@ -2,7 +2,7 @@
 
 L1 카테고리는 **인지유형 5종**이다(경험·개념·절차·통찰·주장). 한 Thought는 하나의 인지유형에
 속한다(단일 소속). 주제(운동·식단 등)는 L1이 아니라 `tags` + 벡터 임베딩이 담당하며, 폴더는
-**인지유형당 flat**이다(L2 토픽 폴더 없음).
+**flat**이다 — 모든 Thought는 `memory/` 직속에 저장되고 인지유형은 `category_path`로 식별한다(폴더 없음).
 
 이 파일은 `_rules/categories/_active.md`가 가리키는 **활성 스키마**다. operation 규칙은 파일명을
 직접 박지 않고 `_active.md`의 active_schema를 통해 참조한다.
@@ -77,5 +77,5 @@ ID 접두사 `{인지유형약어}`의 **정본**이다. 약어는 여기서만 
 인지유형 5종은 고정 온톨로지다. 새 L1(인지유형) 추가는 자동으로 하지 않으며, 추가 시:
 1. 위 약어 레지스트리에 `경로 → 약어` 등록 + 충돌 검사.
 2. 분류 기준 명문화.
-3. `memory/<type>/_index.md` 초기화 + `memory/index.md`에 행 추가.
+3. `memory/index.md`에 인지유형 행 추가(별도 폴더/_index 없음 — Thought는 memory/ 직속).
 4. `tools/lib/scan.mjs`의 `TYPES` 배열에 추가.
