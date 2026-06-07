@@ -7,6 +7,8 @@
 - 삭제 규칙:    _rules/operations/delete_rules.md
 - 정비 규칙:    _rules/operations/lint_rules.md
 - 카테고리 기준: _rules/categories/category_schema.md (활성 스키마: _rules/categories/_active.md)
+- edge 기준:    _rules/edges/edge_schema.md (활성 스키마: _rules/edges/_active.md)
+- 조회/색인 CLI: tools/query.mjs · tools/index.mjs · tools/lint.mjs (부트스트랩: tools/README.md)
 
 ## 운영 상태
 - 카테고리 목록: memory/index.md

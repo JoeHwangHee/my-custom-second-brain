@@ -1,6 +1,15 @@
-# 구조 결함 정비 검증 결과
+# 검증 결과
 
-이 문서는 9개 구조적 결함(#1–#9, 추가 발견 G1–G4 포함) 정비 후, 규칙을 실제 입력으로
+> **v6.0 벡터 하이브리드 전환(2026-06-07)으로 아래 v5.0 검증(#1–#9·G1–G4, 3계층 마이그레이션)은
+> 무효화됨.** 인지유형 L1·flat 트리·캐스케이드/TEMPR/RRF 폐지·memory_type 제거로 해당 시나리오의
+> 전제(주제 L1, 캐스케이드 라우팅)가 더 이상 성립하지 않는다. 아래는 v5.0 이력 보존용이며, v6.0
+> 검증은 맨 아래 "§v6.0 검증" 절을 따른다.
+
+---
+
+## (이력) 구조 결함 정비 검증 결과 — v5.0
+
+이 절은 9개 구조적 결함(#1–#9, 추가 발견 G1–G4 포함) 정비 후, 규칙을 실제 입력으로
 end-to-end 실행해 데이터 정합성이 닫히는지 검증한 결과를 기록한다.
 
 - 검증 방식: 임시 브랜치(`verify/scenarios`)에서 실제 Thought/인덱스/그래프/로그 파일을
@@ -56,3 +65,27 @@ end-to-end 검증.
 
 핵심: 데이터 트리(`memory/`)는 이동만 되고 논리 `category_path`/`category:`는 불변. operation 규칙은
 카테고리 스키마를 `_active.md`로 추상 참조하여 스키마 교체 시 operation 무수정 재사용이 가능하다.
+
+---
+
+## §v6.0 검증 (2026-06-07) — 벡터 하이브리드
+
+로컬 Mac(Apple Silicon, Node v24)에서 정적 + 실제 임베딩 E2E로 검증. 검증 후 샘플 데이터는
+폐기하고 규칙/코드만 유지한다(새출발).
+
+| 검증 | 방법 | 결과 |
+|---|---|---|
+| db 단위 | `node --test` 합성 1024-dim 벡터 | upsert·KNN·dedup·delete·prune 4/4 **PASS** |
+| 임베딩 파이프라인 | `index.mjs --all` → `query.mjs "운동"` | 3건 색인, score순 반환 **PASS** |
+| **직교 조회** | `query "운동"` vs `query "운동" --type th` | 전자=ep/se/th 3인지유형 전부, 후자=thesis만. **fan-out/RRF 없이 직교 해소 PASS** |
+| 관계 발견 | `query --related <ep>` | se(스쿼트 개념)가 1위(0.524) 자동 후보 **PASS** |
+| Lint 결정론 | `lint.mjs --apply` | entry_count(ep/se/th=1, pr/rf=0) 정확, examples=centroid 자동, orphan 리포트 **PASS** |
+| 삭제+prune | se 파일 삭제 → `index --prune` | 고아 1건 제거, 검색에서 소멸 **PASS** |
+| **이식성** | `.index` 삭제 → `index --all` 재생성 | markdown(SSOT)만으로 동일 결과 복원 **PASS** |
+| 정적 청결성 | grep | memory_type/daily_life/learning/dl-health 실사용 0(DESIGN v5 이력 제외), edge 수치 operation 하드코딩 0, ingest_since_lint 0, 경로 실재 **PASS** |
+| 장애 처리 | embed.mjs | Ollama 미기동 시 친절 에러 + ingest reindex_pending 백스톱(코드 확인) **PASS** |
+
+핵심: 인지유형 L1 정체성을 유지하면서, 같은 주제가 여러 인지유형에 흩어져도 **한 번의 벡터 검색 +
+메타필터**로 조회된다(v5 캐스케이드/TEMPR/RRF 폐지). 벡터DB는 파생물이라 `.index` 삭제 후
+markdown만으로 완전 재생성된다(이식성 보존). 조회 랭킹·정합성·관계 발견은 CLI/벡터(결정론)가,
+인지유형·edge 의미·답변 합성은 LLM이 분담한다.

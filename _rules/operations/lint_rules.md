@@ -1,159 +1,80 @@
-# lint_rules.md — 정비 규칙
+# lint_rules.md — 정비 규칙 (v6.0 벡터 하이브리드)
 
-실메모리의 물리 루트는 `memory/`다. 아래 `_index.md`/`_graph.md`는 `memory/` 하위 경로
-기준의 상대 지칭이며, 카테고리 스키마는 `_rules/categories/_active.md`가 가리키는
-"활성 스키마"를 참조한다.
+대부분의 정비를 `tools/lint.mjs`(결정론)로 이관한다. LLM은 리포트를 받아 **사용자 확인/판단**만
+한다(자동 병합·자동 frontmatter 수정 금지). edge/카테고리 수치는 활성 스키마 참조.
 
 ---
 
 ## 1. 트리거 조건
 
-`_rules/_state/_lint_status.md`를 읽어 아래 내부 조건 충족 시 실행한다.
+`_rules/_state/_lint_status.md`를 읽어 판단한다.
 
 ```
-내부 자동 조건: ingest_since_lint ≥ 50  (유일한 내부 트리거)
-
-시간 기반(24h) 조건은 두지 않는다. LLM은 "24h 경과"를 스스로 주기 감지할 수 없으므로,
-주기적 정비는 외부 메신저가 일반 Lint 명령("정비해줘")을 주입해 Stage 1 경로로 실행한다.
+내부 자동: ingest_since_lint ≥ 50  (유일한 내부 트리거)
+주기 정비: 외부 메신저가 일반 Lint 명령("정비해줘") 주입 → 즉시 실행
+(시간 기반 24h 조건 없음)
 ```
 
 ---
 
-## 2. 실행 항목 (순서대로)
-
-### Step 1 — _pending.md 미결 항목 안내
+## 2. 실행 — tools/lint.mjs
 
 ```
-_rules/_state/_pending.md에 항목이 존재하면 사용자에게 먼저 안내한다.
-Lint 본체는 블로킹 없이 계속 진행한다.
+node tools/lint.mjs            # 동기화 + 정합성/near-miss 리포트 (수정 없음)
+node tools/lint.mjs --apply    # + _index.md entry_count·examples(centroid) 자동 기록
 ```
 
-### Step 2 — _index.md 헤더 정합성 점검
-
-모든 카테고리의 _index.md 헤더를 순차 점검한다.
+`lint.mjs`가 수행하는 결정론 작업:
 
 ```
-entry_count 검증:
-  해당 카테고리가 직접 보유한 Thought 파일 수만 재산정 (하위 카테고리 파일 제외)
-  중간노드는 직접 보유 파일이 없으므로 entry_count = 0이 정상
-  _index.md의 entry_count와 불일치 시 자동 수정
-
-examples 검증:
-  examples에 기재된 파일 title이 실제로 해당 카테고리에 존재하는지 확인
-  존재하지 않는 항목 제거 (파일 이동/삭제로 인한 고아 examples)
-  examples 항목이 5개 미만이면 현재 카테고리 파일 중 최신 항목으로 자동 보충
-  분할 후 편향된 샘플만 남은 경우 LLM이 카테고리 대표 항목으로 재선정
-
-keywords 검증:
-  카테고리 내 파일들의 tags 빈도 집계 (leaf용)
-  상위 빈도 태그가 _index.md keywords에 없으면 추가 제안
-
-  L1 keywords/description 정본 대조 (SSOT 사후 수렴):
-    정본은 활성 스키마다. memory/index.md 및 각 L1 _index.md의 L1
-    keywords/description을 정본과 대조해 불일치 시 정본 기준으로 자동 수정한다.
-    (완전 SSOT가 아니라 Lint 시점 사후 수렴 — Query는 파생본을 읽으므로)
+[sync]   tools/index.mjs --all 효과: 누락 임베딩 색인 + 고아 벡터 prune (md↔DB 동기)
+         (reindex_pending 백스톱도 여기서 해소)
+[index]  각 인지유형 entry_count 재산정 → _index.md (--apply)
+         examples = 카테고리 centroid 최근접 N → _index.md (--apply)
+[check]  깨진 링크(related id 부재), 고아 파일(참조 0), reflective related 누락 리포트
+[near-miss] 임베딩 고유사 쌍(기본 ≥0.92) 중 related 없는 쌍을 중복 후보로 제시 (자동병합 금지)
 ```
 
-### Step 3 — 분할 조건 점검
+---
 
-블로킹 없이 조건 감지 시 _rules/_state/_pending.md에 기록 후 계속 진행한다.
-
-```
-_index.md 분할 조건:
-  entry_count(직접 보유 파일 수, leaf 기준) > 50 감지 시:
-  → _rules/_state/_pending.md에 기록:
-    - type: split_proposal
-      category: {해당 카테고리 경로}
-      detected: {현재 시각}
-      suggested: [{제안 하위 카테고리 목록}]
-
-_graph.md 분할 조건:
-  항목 수 > 100 감지 시:
-  → _rules/_state/_pending.md에 기록:
-    - type: graph_split_proposal
-      level: {해당 _graph.md 경로}
-      detected: {현재 시각}
-```
-
-### Step 4 — 분할 승인 후 처리
-
-사용자가 _rules/_state/_pending.md 항목을 승인한 경우에만 실행한다.
+## 3. LLM이 사용자 확인을 받아 처리하는 항목 (lint.mjs 리포트 기반)
 
 ```
-_index.md 분할 처리:
-  1. 항목들을 의미 기반으로 클러스터링
-  2. 하위 폴더 및 각 _index.md 생성
-  3. 항목들을 각 하위 _index.md로 이관
-  4. 상위 _index.md는 하위 카테고리 목록 + 한 줄 설명만 유지
-  5. 이관된 Thought 파일들의 category_path 필드 새 경로로 일괄 업데이트
-  6. 해당 레벨 _graph.md의 경로 참조 수정
-  7. memory/log.md에 split_reconciled 이벤트 기록
-
-_graph.md 분할 처리:
-  1. 엣지를 출발 노드의 카테고리 기준으로 클러스터링
-  2. 하위 레벨 _graph.md 생성 후 이관
-  3. 현재 레벨 _graph.md는 상위 크로스 엣지만 유지
+- 깨진 링크: 해당 related 항목 제거 또는 사용자 확인
+- reflective related 누락: 규칙 위반 → 근거 추가 요청 (또는 재분류)
+- near-miss 후보: 사용자에게 "거의 중복" 제시 → near-miss 엣지 추가 / 병합 / 무시 중 택1
+- 고아 파일: 목록화하여 사용자에게 확인
+- 모순(contradicts) 쌍: 내용 충돌 심각 시 검토 요청
 ```
 
-### Step 5 — link_strength 재산정
+---
+
+## 4. link_strength 재산정 (co_occurrence)
 
 ```
-1. memory/log.md에서 마지막 LINT executed 이후 QUERY 엔트리만 추출
-2. 각 QUERY 엔트리의 accessed_file_ids에서 모든 쌍(pair) 생성
-   예: [A, B, C] → (A,B), (A,C), (B,C)
-3. 각 쌍에 대해:
-   → 둘 중 한 파일의 related: 섹션에 상대방 ID 존재 여부 확인
-   → 존재하면 co_occurrence_count +N
-     (N = 마지막 LINT 이후 QUERY 엔트리들의 accessed_file_ids에서 두 ID가 함께 나타난 엔트리 수)
-   → 존재하지 않으면 스킵 (신규 관계 자동 생성 금지)
-4. co_occurrence_count 업데이트 후 link_strength 재산정:
-   link_strength = max(base_score, base_score × 0.6 + co_occurrence_score × 0.4)
-   co_occurrence_score = min(co_occurrence_count / 20, 1.0)
-5. 변경된 Thought 파일 frontmatter 저장
-6. 해당 쌍이 크로스 카테고리면 _graph.md도 동기 갱신:
-   → 크로스 여부 및 기록 레벨은 _rules/operations/storage_rules.md "크로스 카테고리 관계 처리"의
-     category_path 비교 규칙을 따른다(L1 다름→memory/_graph.md, 같은 L1·다른 L2→해당 L1).
-   → 결정된 레벨 _graph.md에서 (from_id, to_id) 행을 찾아 link_strength를
-     4번에서 재산정한 값과 동일하게 갱신한다.
-   ※ link_strength가 Thought related:와 _graph.md 두 곳에 이중 저장되므로,
-     이 동기 누락 시 graph 값이 base_score에 고착된다(정합성 결함 방지).
+1. memory/log.md에서 마지막 LINT 이후 QUERY 엔트리의 accessed_file_ids 추출
+2. 각 쌍에 대해 한쪽 related: 에 상대 id가 있으면 co_occurrence_count += (함께 등장한 엔트리 수)
+   (없으면 스킵 — 신규 관계 자동 생성 금지)
+3. link_strength = max(base_score, base_score×0.6 + min(co_occurrence_count/20,1.0)×0.4)
+   base_score는 활성 edge 스키마(_rules/edges/edge_schema.md) 참조.
+4. 변경된 Thought frontmatter 및 (크로스면) memory/_graph.md 동기 갱신.
 ```
 
-### Step 6 — 정합성 점검
+(데이터/QUERY 로그가 쌓이기 전에는 no-op. frontmatter 자동수정이므로 변경분만 신중히 적용.)
+
+---
+
+## 5. log.md 정리 + 상태 갱신
 
 ```
-모순 점검:
-  contradicts 관계를 가진 파일 쌍에서 내용 충돌 수준 확인
-  심각한 모순 발견 시 사용자에게 검토 요청
-
-고아 페이지 점검:
-  related: 섹션이 없는 reflective 파일 → 규칙 위반. 사용자에게 related 추가 요청
-  어떤 파일에서도 참조되지 않는 파일 → 목록화하여 사용자에게 확인
-
-깨진 링크 점검:
-  related: 섹션의 id가 실제 파일로 존재하는지 확인
-  존재하지 않는 id → 해당 related 항목 제거 또는 사용자 확인
-  _graph.md 고아 엣지 점검: from_id/to_id 중 실제 파일로 존재하지 않는 id를
-    참조하는 행 제거 (수동 삭제 시 즉시 보정 누락분의 백스톱)
+memory/log.md: 30일 초과 항목 삭제 (LINT executed 최근 1건은 영구 보존)
+_rules/_state/_lint_status.md: last_lint = 현재 시각, ingest_since_lint = 0
+memory/log.md: {timestamp} | LINT | executed
 ```
 
-### Step 7 — memory/log.md 정리
+---
 
-```
-30일 초과 항목 삭제
-단, LINT executed 항목 중 가장 최근 1건은 날짜와 무관하게 보존
-```
+## 6. 분할 (향후)
 
-### Step 8 — _rules/_state/_lint_status.md 갱신
-
-```
-last_lint: {현재 시각}
-ingest_since_lint: 0
-```
-
-### Step 9 — memory/log.md 기록
-
-```
-형식: {timestamp} | LINT | executed
-예시: 2026-05-30T09:25:00 | LINT | executed
-```
+flat 인지유형 구조에서는 L2 분할 클러스터링을 두지 않는다(주제는 tags+벡터). 인지유형당 파일이
+과도하게 많아지면 사용자 판단으로 정비한다. 임베딩 클러스터 기반 자동 분할은 향후 확장 항목이다.

@@ -16,5 +16,10 @@ Lint가 항목을 추가하며 블로킹 없이 계속 진행한다.
     content: {보류된 통찰 요약}
     note: related 근거 미특정으로 저장 보류됨
 
+  - type: reindex_pending
+    file: {경로}
+    detected: {감지 시각}
+    note: 임베딩 인덱싱 실패(Ollama 미기동 등) — 다음 Lint의 tools/index.mjs --all로 재색인
+
 ---
 
