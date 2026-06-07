@@ -3,8 +3,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
 import { createHash } from 'node:crypto';
-import { stringify } from 'yaml';
-import { parseFile, splitFrontmatter, embedText } from './lib/frontmatter.mjs';
+import { embedText } from './lib/frontmatter.mjs';
 import { embed } from './lib/embed.mjs';
 import {
   openDb,
@@ -68,15 +67,20 @@ function centroidExamples(db, type, n = 3) {
     .filter(Boolean);
 }
 
-function updateIndexHeader(type, { entryCount, examples }) {
-  const path = join(MEMORY_DIR, type, '_index.md');
+// flat 구조: 인지유형별 _index.md 대신 memory/index.md 통계 섹션(마커)을 갱신
+function updateStatsSection(stats) {
+  const path = join(MEMORY_DIR, 'index.md');
   if (!existsSync(path)) return false;
   const raw = readFileSync(path, 'utf8');
-  const { data, body } = splitFrontmatter(raw);
-  data.entry_count = entryCount;
-  if (examples && examples.length) data.examples = examples;
-  const fm = stringify(data).trimEnd();
-  writeFileSync(path, `---\n${fm}\n---\n${body.replace(/^\n+/, '')}`);
+  const rows = stats
+    .map((s) => `| ${s.type} | ${s.count} | ${s.examples.join('; ') || '-'} |`)
+    .join('\n');
+  const table = `| 인지유형 | entry_count | examples |\n|---|---|---|\n${rows}`;
+  const replaced = raw.replace(
+    /<!-- lint:stats:start -->[\s\S]*?<!-- lint:stats:end -->/,
+    `<!-- lint:stats:start -->\n${table}\n<!-- lint:stats:end -->`
+  );
+  writeFileSync(path, replaced);
   return true;
 }
 
@@ -131,17 +135,15 @@ async function main() {
 
     const files = thoughtFiles();
 
-    // 2) entry_count + examples(centroid) — apply 시 _index.md 기록
+    // 2) entry_count + examples(centroid) → memory/index.md 통계 섹션 (apply 시 기록)
+    const stats = [];
     for (const type of TYPES) {
       const count = files.filter((f) => String(f.data.category_path || '').split('/')[0] === type).length;
       const examples = apply ? centroidExamples(db, type) : [];
-      if (apply) {
-        updateIndexHeader(type, { entryCount: count, examples });
-        console.log(`[index] ${type}: entry_count=${count}, examples=${examples.length}`);
-      } else {
-        console.log(`[check] ${type}: entry_count=${count}`);
-      }
+      stats.push({ type, count, examples });
+      console.log(`[${apply ? 'index' : 'check'}] ${type}: entry_count=${count}`);
     }
+    if (apply) updateStatsSection(stats);
 
     // 3) 정합성 리포트 (자동수정 금지 — 사용자 확인용)
     const { broken, reflectiveNoRel, orphans, relatedPairs } = consistencyReport(files);

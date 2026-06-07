@@ -21,7 +21,7 @@
 
 ```
 node tools/lint.mjs            # 동기화 + 정합성/near-miss 리포트 (수정 없음)
-node tools/lint.mjs --apply    # + _index.md entry_count·examples(centroid) 자동 기록
+node tools/lint.mjs --apply    # + memory/index.md 통계(entry_count·examples centroid) 자동 기록
 ```
 
 `lint.mjs`가 수행하는 결정론 작업:
@@ -29,8 +29,7 @@ node tools/lint.mjs --apply    # + _index.md entry_count·examples(centroid) 자
 ```
 [sync]   tools/index.mjs --all 효과: 누락 임베딩 색인 + 고아 벡터 prune (md↔DB 동기)
          (reindex_pending 백스톱도 여기서 해소)
-[index]  각 인지유형 entry_count 재산정 → _index.md (--apply)
-         examples = 카테고리 centroid 최근접 N → _index.md (--apply)
+[index]  각 인지유형 entry_count·examples(centroid 최근접) 재산정 → memory/index.md 통계 섹션 (--apply)
 [check]  깨진 링크(related id 부재), 고아 파일(참조 0), reflective related 누락 리포트
 [near-miss] 임베딩 고유사 쌍(기본 ≥0.92) 중 related 없는 쌍을 중복 후보로 제시 (자동병합 금지)
 ```

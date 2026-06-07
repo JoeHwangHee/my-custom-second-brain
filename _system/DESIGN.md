@@ -9,7 +9,8 @@
 
 **정체성 전환**: "주제별 정보 아카이브"(v5 daily_life/learning) → **"인지유형별 사고 기록"**.
 L1 = 인지유형 5종(episodic·semantic·procedural·reflective·thesis, 약어 ep/se/pr/rf/th).
-주제는 L1이 아니라 `tags` + 벡터가 담당하며 폴더는 **인지유형당 flat**(L2 토픽 폴더 없음).
+주제는 L1이 아니라 `tags` + 벡터가 담당한다. Thought는 `memory/` 직속에 저장되고(폴더 없음)
+인지유형은 `category_path`로 식별한다(v6.1 flat).
 
 **근본 동기**: 인지유형과 주제는 직교 차원이라 폴더로 둘 다 가지치기할 수 없고(주제가 5개
 인지유형에 흩어져 조회 fan-out 폭발), 화행 신호 라우팅은 캐스케이드 토큰 절약을 무력화한다.
