@@ -1,0 +1,18 @@
+{
+  "name": "second-brain-tools",
+  "version": "6.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Second Brain v6.0 로컬 임베딩 인덱싱/조회 CLI (Ollama bge-m3 + sqlite-vec)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "sqlite-vec": "^0.1.7-alpha.2",
+    "yaml": "^2.6.1"
+  }
+}

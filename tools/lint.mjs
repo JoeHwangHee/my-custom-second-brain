@@ -1,0 +1,165 @@
+#!/usr/bin/env node
+// lint.mjs — 결정론 정비: 벡터동기화·entry_count·examples(centroid)·near-miss·깨진링크
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join, resolve, relative } from 'node:path';
+import { createHash } from 'node:crypto';
+import { stringify } from 'yaml';
+import { parseFile, splitFrontmatter, embedText } from './lib/frontmatter.mjs';
+import { embed } from './lib/embed.mjs';
+import {
+  openDb,
+  upsertItem,
+  pruneMissing,
+  typeEmbeddings,
+  allEmbeddings,
+} from './lib/db.mjs';
+import { ROOT, MEMORY_DIR, DB_PATH, TYPES, thoughtFiles } from './lib/scan.mjs';
+
+const has = (f) => process.argv.includes(f);
+function arg(f, d) {
+  const i = process.argv.indexOf(f);
+  return i >= 0 ? process.argv[i + 1] : d;
+}
+
+const exists = (relPath) => existsSync(resolve(ROOT, relPath));
+const dot = (a, b) => {
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+  return s;
+};
+
+async function syncVectors(db) {
+  let indexed = 0;
+  for (const f of thoughtFiles()) {
+    const text = embedText(f.data, f.body);
+    const hash = createHash('sha256').update(text).digest('hex').slice(0, 16);
+    upsertItem(
+      db,
+      {
+        id: f.data.id,
+        path: relative(ROOT, f.path),
+        title: f.data.title ? String(f.data.title) : '',
+        type: String(f.data.category_path || '').split('/')[0] || '',
+        tags: f.data.tags || [],
+        origin: f.data.origin || '',
+        date: f.data.date ? String(f.data.date) : '',
+        hash,
+      },
+      await embed(text)
+    );
+    indexed++;
+  }
+  const pruned = pruneMissing(db, exists);
+  return { indexed, pruned };
+}
+
+function centroidExamples(db, type, n = 3) {
+  const items = typeEmbeddings(db, type);
+  if (!items.length) return [];
+  const dim = items[0].emb.length;
+  const c = new Array(dim).fill(0);
+  for (const it of items) for (let i = 0; i < dim; i++) c[i] += it.emb[i];
+  for (let i = 0; i < dim; i++) c[i] /= items.length;
+  return items
+    .map((it) => ({ title: it.title, s: dot(it.emb, c) }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, n)
+    .map((x) => x.title)
+    .filter(Boolean);
+}
+
+function updateIndexHeader(type, { entryCount, examples }) {
+  const path = join(MEMORY_DIR, type, '_index.md');
+  if (!existsSync(path)) return false;
+  const raw = readFileSync(path, 'utf8');
+  const { data, body } = splitFrontmatter(raw);
+  data.entry_count = entryCount;
+  if (examples && examples.length) data.examples = examples;
+  const fm = stringify(data).trimEnd();
+  writeFileSync(path, `---\n${fm}\n---\n${body.replace(/^\n+/, '')}`);
+  return true;
+}
+
+function nearMissCandidates(db, threshold, relatedPairs) {
+  const all = allEmbeddings(db);
+  const out = [];
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      const s = dot(all[i].emb, all[j].emb);
+      if (s >= threshold) {
+        const key = [all[i].id, all[j].id].sort().join('::');
+        if (!relatedPairs.has(key)) out.push({ a: all[i].id, b: all[j].id, sim: Number(s.toFixed(3)) });
+      }
+    }
+  }
+  return out.sort((x, y) => y.sim - x.sim);
+}
+
+function consistencyReport(files) {
+  const ids = new Set(files.map((f) => f.data.id));
+  const broken = [];
+  const reflectiveNoRel = [];
+  const relatedPairs = new Set();
+  const referenced = new Set();
+  for (const f of files) {
+    const rel = Array.isArray(f.data.related) ? f.data.related : [];
+    const type = String(f.data.category_path || '').split('/')[0];
+    if (type === 'reflective' && rel.length === 0) reflectiveNoRel.push(f.data.id);
+    for (const r of rel) {
+      if (!r || !r.id) continue;
+      relatedPairs.add([f.data.id, r.id].sort().join('::'));
+      referenced.add(r.id);
+      if (!ids.has(r.id)) broken.push({ from: f.data.id, to: r.id });
+    }
+  }
+  const orphans = [...ids].filter((id) => !referenced.has(id));
+  return { broken, reflectiveNoRel, orphans, relatedPairs };
+}
+
+async function main() {
+  const apply = has('--apply');
+  const threshold = parseFloat(arg('--near-miss-threshold', '0.92'));
+  const db = openDb(DB_PATH);
+  try {
+    // 1) 벡터 동기화 (Ollama 필요; 실패 시 기존 db로 계속)
+    try {
+      const { indexed, pruned } = await syncVectors(db);
+      console.log(`[sync] indexed ${indexed}, pruned ${pruned}`);
+    } catch (e) {
+      console.warn(`[sync] 건너뜀: ${e.message.split('\n')[0]}`);
+    }
+
+    const files = thoughtFiles();
+
+    // 2) entry_count + examples(centroid) — apply 시 _index.md 기록
+    for (const type of TYPES) {
+      const count = files.filter((f) => String(f.data.category_path || '').split('/')[0] === type).length;
+      const examples = apply ? centroidExamples(db, type) : [];
+      if (apply) {
+        updateIndexHeader(type, { entryCount: count, examples });
+        console.log(`[index] ${type}: entry_count=${count}, examples=${examples.length}`);
+      } else {
+        console.log(`[check] ${type}: entry_count=${count}`);
+      }
+    }
+
+    // 3) 정합성 리포트 (자동수정 금지 — 사용자 확인용)
+    const { broken, reflectiveNoRel, orphans, relatedPairs } = consistencyReport(files);
+    if (broken.length) console.log(`[broken-link] ${broken.map((b) => `${b.from}→${b.to}`).join(', ')}`);
+    if (reflectiveNoRel.length) console.log(`[reflective-no-related] ${reflectiveNoRel.join(', ')}`);
+    if (orphans.length) console.log(`[orphan] ${orphans.join(', ')}`);
+
+    // 4) near-miss 후보 (고유사·미연결 쌍 — 자동병합 금지)
+    const nm = nearMissCandidates(db, threshold, relatedPairs);
+    if (nm.length) console.log(`[near-miss 후보] ${nm.map((p) => `${p.a}~${p.b}(${p.sim})`).join(', ')}`);
+
+    if (!broken.length && !reflectiveNoRel.length && !nm.length) console.log('[ok] 정합성 이상 없음');
+  } finally {
+    db.close();
+  }
+}
+
+main().catch((e) => {
+  console.error(String(e.message || e));
+  process.exit(1);
+});
