@@ -1,251 +1,141 @@
-# storage_rules.md — 저장 규칙
+# storage_rules.md — 저장 규칙 (v6.0 벡터 하이브리드)
 
 `_system/router.md`에서 Ingest로 확정된 입력을 처리한다.
 
-실메모리의 물리 루트는 `memory/`다. 아래 `_index.md`/`_graph.md`는 `memory/` 하위 경로
-기준의 상대 지칭이며, 카테고리 스키마는 `_rules/categories/_active.md`가 가리키는
-"활성 스키마"를 참조한다(스키마 파일명을 직접 박지 않는다).
+카테고리 스키마는 `_rules/categories/_active.md`가 가리키는 활성 스키마를, edge 정의는
+`_rules/edges/_active.md`가 가리키는 활성 edge 스키마를 참조한다(파일명 직접 박지 않음).
+
+> v5의 3단 캐스케이드(Keyword/Tag/Semantic)와 memory_type 필드는 폐지됐다. L1은 **인지유형**이고,
+> 분류는 LLM이 화행으로 1회 판단한다(어차피 글을 읽으므로 추가 토큰 없음). 조회 라우팅은 벡터가 한다.
 
 ---
 
-## 1. 카테고리 결정 — 3단 캐스케이드
+## 1. 인지유형(L1) 결정 — LLM 화행 판단
 
-### Step 1 — Keyword Gate (결정론적)
-
-```
-입력 콘텐츠에서 키워드 추출
-→ 활성 스키마의 각 카테고리 keywords 목록과 대조
-→ 매칭 카테고리 존재 시: 즉시 해당 경로로 저장. Step 2, 3 스킵.
-```
-
-### Step 2 — Tag Gate (준결정론적)
+입력 내용을 읽고 활성 스키마의 인지유형 5종 중 하나로 분류한다.
 
 ```
-Step 1 실패 시 진입
-→ 입력 콘텐츠의 tags 필드와 각 _index.md 헤더의 keywords 대조
-→ 매칭 카테고리 존재 시: 해당 경로로 저장. Step 3 스킵.
+episodic  : 시간/장소가 있는 1인칭 경험 ("~했다")        · origin: first_party만
+semantic  : 사실·개념·정의 ("~이다", "~란")
+procedural: 절차·방법 ("~하는 법", "먼저~그다음")
+reflective: 복수 경험서 도출한 메타 통찰 ("되돌아보니~")  · related 필수, tags에 "reflective"
+thesis    : 명시적 주장·입장·평가 ("~해야 한다", "~라고 본다")
 ```
 
-### Step 3 — Semantic Fallback (LLM 판단)
+### 다중 화행 신호 → 분해 저장
+한 입력에 여러 인지유형이 섞이면(예: "운동했더니 꾸준함이 중요하다 싶다"):
+- 경험은 episodic, 통찰은 reflective로 **분해**해 각각 Thought를 만든다.
+- reflective는 `related:` 필수 → 분해된 episodic을 근거로 `synthesized` 엣지로 자동 연결한다
+  (다른 인지유형 간이므로 `memory/_graph.md`에도 기록).
+- 애매하면 지배적 신호로 단일 분류한다.
 
-```
-Step 1, 2 모두 실패 시 진입
-→ LLM이 후보 _index.md 헤더(description + keywords + examples) 읽고 판단
-→ 유사도 75% 이상: 해당 경로 저장
-→ 유사도 75% 미만: 사용자에게 새 카테고리 생성 제안
-
-제안 형식:
-  "입력하신 내용은 기존 카테고리와 다른 주제로 판단됩니다.
-   제안 카테고리: [경로/제안명]
-   이유: [한 줄 근거]
-   → 생성하시겠습니까? (Y / N / 직접 경로 입력)"
-
-  Y:          제안 경로로 카테고리 생성 후 저장
-  N:          가장 유사한 기존 카테고리에 저장
-  직접 입력:  사용자 지정 경로로 생성 후 저장
-
-주의: Step 3의 "새 카테고리 생성 제안(사용자 확인)"은 신규 L1이 필요한 경우에만 적용한다.
-기존 L1 하위의 leaf가 없거나 적합 leaf가 없을 때는 사용자 확인 없이 Step 4에서 자동 생성한다.
-```
-
-### Step 4 — leaf 도달 및 L2 이하 자동 생성
-
-```
-캐스케이드로 L1을 확정한 뒤, 실제 저장 위치인 leaf까지 내려간다.
-
-1. 해당 L1 아래로 캐스케이드(Step 1~3)를 반복해 적합 leaf 탐색.
-   → 적합 leaf 존재: 그 leaf에 저장. (이하 절차 종료)
-
-2. leaf 미존재(L1이 중간노드뿐이거나 하위가 비어 있음) 또는 적합 leaf 없음:
-   → L2 이하 하위 카테고리를 자동 생성한다(사용자 확인 불필요).
-     단, 기존 하위와 유사도 75% 미만일 때만 신설한다(Step 3 임계 재사용).
-     75% 이상이면 가장 유사한 기존 leaf에 저장한다.
-
-   자동 생성 절차:
-     a. 콘텐츠 주제로 하위 카테고리명(L2/L3...) 결정
-     b. 폴더 생성 + leaf _index.md 생성
-        (헤더: category / description / keywords / examples: [] / entry_count: 0)
-        필요 시 해당 레벨 _graph.md 초기화
-     c. ★ 부모(중간노드) _index.md의 "## 하위 카테고리" 표에 신규 leaf 행 추가.
-        표/섹션이 없으면(예: 비어 있던 learning/_index.md) 섹션을 신설하고 첫 행 기재.
-        부모 중간노드의 entry_count는 0으로 유지(불변).
-     d. 생성된 leaf에 Thought 파일 저장
-     e. memory/log.md에 CATEGORY 이벤트 기록: {timestamp} | CATEGORY | {created_path}
-
-원칙: L1 신규 생성만 사용자 확인. L2 이하는 임계 충족 시 자동 생성 후 log로 사후 통지.
-```
+주제(운동·식단 등)는 L1이 아니라 `tags`로 기록한다. 폴더는 인지유형당 flat(L2 토픽 폴더 없음).
 
 ---
 
-## 2. Thought 파일 생성 규칙
+## 2. Thought 파일 생성
 
-### ID 생성
-
-```
-형식: {카테고리코드}-{세부}-{날짜}-{순번}
-예시: dl-health-20260524-001
-
-카테고리코드: L1 약어 (daily_life → dl, learning → ln 등)
-날짜: YYYYMMDD
-순번: 해당 카테고리+날짜 조합 기준 오늘의 누적 순번 (001부터 시작)
-
-ID 접두사 파싱만으로 카테고리 판단 가능하도록 설계.
-파일을 읽지 않고 크로스 카테고리 여부 판단에 활용.
-```
-
-### 순번 산정 절차 (필수)
-
-```
-순번은 log.md로 세지 않는다. log.md는 30일 롤오버되므로 과거 순번이 사라져
-카운트가 리셋되고, 같은 날 2건째 저장 시 -001이 재발급되어 기존 파일을 덮어쓴다.
-
-대신 디렉토리를 직접 스캔한다:
-  1. 저장 대상 L2 폴더에서 {카테고리코드}-{세부}-{날짜}-*.md 글롭
-  2. 기존 파일들의 순번 중 최댓값 확인 (없으면 0)
-  3. 신규 순번 = 최댓값 + 1, 3자리 zero-pad (001, 002, ...)
-  4. 생성 직전 동일 ID 파일 부재를 재확인. 존재 시 순번 +1 후 재시도.
-
-원칙: 동일 (카테고리·날짜) 내에서 ID는 절대 재사용/덮어쓰기 하지 않는다.
+### 형식 (memory_type 없음)
+```yaml
+---
+id: {약어}-{YYYYMMDD}-{순번}          # 예 ep-20260607-001
+title: 제목
+origin: first_party | curated | synthesized
+confidence: high | medium | low
+tags: [주제1, 주제2]
+related:
+  - id: {대상_id}
+    edge_type: {활성 edge 스키마의 edge_type}
+    link_strength: {base_score}       # edge 스키마의 base_score로 초기화
+    co_occurrence_count: 0
+category_path: {인지유형}              # 예 episodic (한 토막, flat)
+date: YYYY-MM-DD
+content_lang: ko
+---
+본문 (마크다운 태그 최소화 — 임베딩 품질)
 ```
 
-### memory_type 결정 기준
-
+### ID 생성 (세부 토막 없음)
 ```
-semantic:    세계에 대한 사실, 개념 서술
-procedural:  절차, 방법, 수행 방식
-episodic:    시간/장소가 있는 개인 경험 (origin: first_party만 허용)
-reflective:  복수 경험/지식에서 도출한 메타 수준 통찰
-
-reflective 분류 신호:
-  - "되돌아보면", "생각해보니", "패턴을 발견했다"
-  - "예전과 달리", "알게 됐다" (메타적 맥락)
-  - 복수의 과거 경험을 종합하는 서술
-
-혼동 방지:
-  단일 경험 + 감상    → episodic
-  외부 지식 + 의견    → semantic
-  복수 경험 + 메타통찰 → reflective
+형식: {인지유형약어}-{YYYYMMDD}-{순번}
+약어: 활성 스키마 약어 레지스트리 (episodic→ep, semantic→se, procedural→pr, reflective→rf, thesis→th)
+순번 산정: 해당 인지유형 폴더에서 글롭 `{약어}-{날짜}-*.md`의 순번 최댓값 + 1, 3자리 zero-pad.
+  생성 직전 동일 ID 부재 재확인. 존재 시 +1 재시도. (덮어쓰기 금지)
+ID 접두사 파싱만으로 L1=인지유형 식별(토큰 절감).
 ```
 
-### reflective 파일 특수 규칙
-
+### 특수 규칙 (L1별)
 ```
-- related: 섹션 필수 (참조 근거 없으면 reflective 불가)
-- related의 edge_type: synthesized 사용
-- confidence 기본값: medium
-- tags에 "reflective" 자동 추가
-```
-
-#### related 누락 시 Ingest 시점 강제 (Lint까지 미루지 않음)
-
-```
-reflective로 분류됐으나 참조할 related 대상을 특정할 수 없으면:
-  1. 사용자에게 근거 파일을 요청한다:
-     "이 통찰의 근거가 된 기존 기록을 알려주시겠습니까? (id 또는 주제)"
-  2. 사용자가 제시 → 해당 id로 related 구성 후 저장
-  3. 근거 없음/불명 → reflective로 저장하지 않는다. 둘 중 하나로 처리:
-     - memory_type을 episodic/semantic으로 재분류하여 저장, 또는
-     - _rules/_state/_pending.md에 보류 항목으로 기록하고 저장 보류
-       (type: reflective_pending, detected, content 요약)
-원칙: related 없는 reflective 파일을 생성하지 않는다.
+reflective: related 필수(edge_type=synthesized 기본), tags에 "reflective" 자동, confidence 기본 medium.
+  related 근거를 특정 못 하면 reflective로 저장하지 않는다 — episodic/semantic으로 재분류하거나
+  _rules/_state/_pending.md에 reflective_pending으로 보류한다.
+thesis: 근거를 related의 supports/contradicts로 연결(권장).
+episodic: origin: first_party만 허용.
 ```
 
-### link_strength 초기값
-
+### link_strength 초기값 / 크로스 카테고리
 ```
-신규 related: 항목 생성 시:
-  co_occurrence_count: 0
-  link_strength: base_score (edge_type에 따라 결정)
+신규 related: 생성 시 link_strength = 활성 edge 스키마의 base_score, co_occurrence_count = 0.
 
-  base_score:
-    extends:     0.70
-    supports:    0.60
-    contradicts: 0.50
-    references:  0.40
+크로스 엣지(다른 인지유형 간만):
+  - 같은 인지유형 내 관계 → 각 파일 related: 로만 처리(graph 미기록).
+  - 다른 인지유형 간 → memory/_graph.md 에 행 추가: | from_id | to_id | edge_type | link_strength |
+  (flat 구조라 같은 인지유형 내 L2 cross는 존재하지 않는다. per-type _graph.md 없음.)
 ```
 
-### 크로스 카테고리 관계 처리
-
+### 관계 자동 발견 (벡터)
 ```
-1차 필터 (저렴): related: 대상 파일 ID 접두사(L1 약어)를 파싱해 현재 파일 L1 약어와 비교.
-  L1 약어 매핑은 활성 스키마의 "L1 카테고리 약어 레지스트리"를 참조한다.
-
-정밀 판정: 양 파일의 category_path를 비교해 기록 레벨을 결정한다.
-  ※ ID 접두사는 L1만 식별하므로 같은 L1·다른 L2 크로스(예: dl-health vs dl-diet)는
-    ID만으로 판단 불가하다. 반드시 category_path로 L2 이하 경계를 비교한다.
-
-  - L1이 다르면        → memory/_graph.md 에 기록
-  - 같은 L1·다른 L2면  → 해당 L1의 _graph.md 에 기록
-  - 같은 L2(동일 leaf) → 크로스 아님. 각 파일 related: 섹션으로만 처리(graph 미기록).
-
-→ 결정된 레벨의 _graph.md에 엣지 추가:
-  | {from_id} | {to_id} | {edge_type} | {link_strength} |
+파일 작성 후 `node tools/query.mjs --related <새파일경로> --json` 호출 →
+top-k 유사 후보를 받아 related 후보로 검토한다. LLM은 후보별 edge_type(의미)만 선택해 연결한다
+(연결을 떠올릴 부담 제거, 회수율↑). 무관하면 연결하지 않는다.
 ```
 
 ---
 
-## 3. _index.md 업데이트 규칙
-
-파일 저장 완료 후 해당 카테고리 _index.md를 업데이트한다.
-
+## 3. _index.md 업데이트
 ```
-entry_count 정의: 해당 카테고리가 직접 보유한 Thought 파일 수.
-  하위 카테고리의 파일은 합산하지 않는다(누적 아님).
-  중간노드(하위 카테고리만 보유)의 entry_count는 0으로 유지된다.
-
-업데이트 대상: Thought 파일이 실제 저장된 leaf _index.md 한 곳만.
-  상위(중간노드) _index.md의 entry_count는 건드리지 않는다.
-
-1. (저장된 leaf의) entry_count +1
-2. examples 항목 수 확인:
-   5개 미만 → 새 파일의 title을 examples에 추가
-   5개 이상 → 업데이트 없음
-3. 하위 목록에 새 파일 항목 추가
+저장된 인지유형 memory/{type}/_index.md:
+  entry_count +1, 새 파일 항목을 목록에 추가.
+  (examples/entry_count 정합은 Lint가 centroid로 재산정 — tools/lint.mjs --apply)
 ```
 
 ---
 
-## 4. _rules/_state/_lint_status.md 업데이트
-
+## 4. 벡터 인덱싱 (필수)
 ```
-저장 완료 후: ingest_since_lint +1
-```
-
----
-
-## 5. memory/log.md 기록
-
-```
-형식: {timestamp} | INGEST | {file_id}
-예시: 2026-05-30T09:20:00 | INGEST | dl-health-20260530-006
+저장 직후: node tools/index.mjs --file <새파일경로>
+  성공: 벡터DB upsert 완료.
+  실패(Ollama 미기동 등): md는 보존하되 경고 출력 + _rules/_state/_pending.md에 기록
+    - type: reindex_pending
+      file: <경로>
+      detected: {시각}
+  → 백스톱: 다음 Lint의 node tools/index.mjs --all 이 누락분을 재색인한다.
 ```
 
 ---
 
-## 6. Ingest 완료 self-check (원자성 보장)
+## 5. 상태/로그
+```
+_rules/_state/_lint_status.md: ingest_since_lint +1
+memory/log.md: {timestamp} | INGEST | {file_id}   (분해 저장 시 각 id, 자동 생성 시 CATEGORY도)
+```
 
-Ingest 1회는 여러 파일을 갱신하므로 부분 실패가 영구화되지 않도록, 저장 종료 전
-아래 항목을 명시적으로 점검하고 누락분을 즉시 보정한 뒤 완료를 선언한다.
+---
 
+## 6. Ingest self-check (원자성)
 ```
 [ ] Thought 파일 생성 (ID 중복 없음 재확인)
-[ ] leaf _index.md: entry_count +1 / examples 보충(5개 미만 시) / 하위 목록에 항목 추가
-[ ] (L2 자동 생성 시) 부모 중간노드 _index.md 하위 카테고리 목록 반영
-[ ] (크로스 카테고리 시) 결정된 레벨 _graph.md에 엣지 추가
-[ ] _rules/_state/_lint_status.md: ingest_since_lint +1
-[ ] memory/log.md: INGEST 기록 (자동 생성 시 CATEGORY 기록도)
+[ ] (다중신호) 분해 저장 + reflective→episodic synthesized 연결(+_graph.md)
+[ ] leaf _index.md: entry_count +1 / 목록 추가
+[ ] (다른 인지유형 간) memory/_graph.md 엣지 추가
+[ ] node tools/index.mjs --file 호출 (실패 시 reindex_pending 기록)
+[ ] node tools/query.mjs --related 로 관계후보 검토 → edge_type 선택 연결
+[ ] _lint_status.md ingest_since_lint +1
+[ ] memory/log.md INGEST 기록
 
-위 6개를 모두 확인한 뒤에만 Ingest 완료로 간주한다.
-하나라도 누락 시 해당 파일을 보정하고 재점검한다.
-
-내부 Lint 트리거 진입점:
-  보정 완료 후 _rules/_state/_lint_status.md의 ingest_since_lint ≥ 50이면 사용자에게 Lint 실행을
-  안내한다(내부 자동 트리거는 이 조건이 유일하다).
+내부 Lint 트리거: 보정 후 ingest_since_lint ≥ 50 이면 사용자에게 Lint 실행 안내.
 ```
 
 ---
 
-## 7. 삭제 처리 → _rules/operations/delete_rules.md 로 분리됨
-
-Delete 처리 규칙은 `_rules/operations/delete_rules.md`를 참조한다(저장/조회/삭제 대칭 확보).
-삭제 시 크로스 엣지 레벨 판정은 위 "크로스 카테고리 관계 처리"의 category_path 비교 규칙을 따른다.
+## 7. 삭제 → _rules/operations/delete_rules.md

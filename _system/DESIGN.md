@@ -1,9 +1,41 @@
-# Second Brain 시스템 설계 v5.0
+# Second Brain 시스템 설계 (v6.0 벡터 하이브리드)
 
-이 문서는 설계 과정에서 결정된 모든 사항을 포함한 완전한 레퍼런스입니다.
-실제 운영 규칙은 각 _rules/operations/ 파일에 기술되어 있으며, 이 문서는 설계 의도와 구조적 맥락을 보존합니다.
+이 문서는 설계 결정의 완전한 레퍼런스입니다. 운영 규칙은 `_rules/operations/`에 있습니다.
+검증 결과는 `./VERIFICATION.md` 참조.
 
-구조 결함 정비(#1–#9, G1–G4)의 end-to-end 검증 결과는 `./VERIFICATION.md` 참조.
+---
+
+## §v6.0 — 벡터 하이브리드 (현행)
+
+**정체성 전환**: "주제별 정보 아카이브"(v5 daily_life/learning) → **"인지유형별 사고 기록"**.
+L1 = 인지유형 5종(episodic·semantic·procedural·reflective·thesis, 약어 ep/se/pr/rf/th).
+주제는 L1이 아니라 `tags` + 벡터가 담당하며 폴더는 **인지유형당 flat**(L2 토픽 폴더 없음).
+
+**근본 동기**: 인지유형과 주제는 직교 차원이라 폴더로 둘 다 가지치기할 수 없고(주제가 5개
+인지유형에 흩어져 조회 fan-out 폭발), 화행 신호 라우팅은 캐스케이드 토큰 절약을 무력화한다.
+→ **벡터 검색이 라우팅을 대신**하면 인지유형 L1 정체성을 토큰 비용 0으로 얻고 캐스케이드·화행
+게이트·TEMPR·RRF·fan-out이 전부 소멸한다(DESIGN §1 "Vector DB 전환"의 실행).
+
+**스택**: Ollama `bge-m3`(1024-dim, cosine) + sqlite-vec, 로컬 Node CLI(`tools/`). Claude가 Bash로
+`tools/query.mjs`를 호출해 후보 ID/경로만 받아 해당 markdown만 로드(Lazy Loading 유지).
+
+**이식성 재정의**: markdown = **SSOT**, 벡터DB(`tools/.index/brain.db`) = `index --all`로 재생성
+가능한 **파생 인덱스**(gitignore). "순수 markdown" 원칙은 SSOT+파생 모델로 보존된다.
+
+**LLM ↔ 결정론 분업**: 조회 랭킹·Lint 정합성(entry_count·examples centroid·near-miss·broken)·관계
+후보 발견(`query --related`)은 CLI/벡터로 이관. 인지유형 화행 판단·edge_type 의미·답변 합성만 LLM.
+
+**데이터 형식 변경**:
+- `memory_type` 필드 **제거** — L1(category_path 인지유형 한 토막)이 대신한다.
+- ID = `{인지유형약어}-{YYYYMMDD}-{순번}`(예 `ep-20260607-001`, 세부 토막 없음). 접두사=L1 식별.
+- edge 온톨로지를 `_rules/edges/`로 **분리**(`edge_schema.md` SSOT + `_active.md` 바인딩).
+  9 실엣지 + near-miss. base_score=link_strength 초기값, edge_weight=graph_score 재순위 계수.
+  near-miss(weight 0)=로드 제외 신호. 2홉 graph_score=두 홉 edge_weight의 min.
+- 크로스 엣지: 같은 인지유형 내는 `related:`, **다른 인지유형 간만** 루트 `memory/_graph.md`
+  (flat이라 per-type _graph.md 없음).
+
+> 아래 §1~§7은 **v5.0 설계 레퍼런스**다. 디렉토리(주제 L1)·memory_type·캐스케이드/TEMPR/RRF·
+> link_strength 표는 위 v6.0으로 **대체**됐다. base_score 등 수치의 정본은 `_rules/edges/edge_schema.md`다.
 
 ---
 

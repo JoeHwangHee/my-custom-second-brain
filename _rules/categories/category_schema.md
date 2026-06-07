@@ -1,92 +1,81 @@
-# category_schema.md — 카테고리 기준
+# category_schema.md — 카테고리 기준 (인지유형 L1, v6.0)
 
-각 L1 카테고리의 포함/제외/경계 기준을 명문화한다.
-3단 캐스케이드 Step 1의 키워드 매칭 및 Step 3의 LLM 판단 기준으로 사용된다.
+L1 카테고리는 **인지유형 5종**이다(경험·개념·절차·통찰·주장). 한 Thought는 하나의 인지유형에
+속한다(단일 소속). 주제(운동·식단 등)는 L1이 아니라 `tags` + 벡터 임베딩이 담당하며, 폴더는
+**인지유형당 flat**이다(L2 토픽 폴더 없음).
 
-이 파일은 `_rules/categories/_active.md`가 가리키는 **활성 스키마 중 하나(기본값)**다.
-operation 규칙(storage/query/lint)은 이 파일명을 직접 박지 않고 `_active.md`의 active_schema를
-통해 "활성 스키마"로 참조한다. 스키마 교체는 `_active.md` 한 곳만 바꾼다.
+이 파일은 `_rules/categories/_active.md`가 가리키는 **활성 스키마**다. operation 규칙은 파일명을
+직접 박지 않고 `_active.md`의 active_schema를 통해 참조한다.
 
-이 파일은 카테고리 추가/변경 시에만 수동으로 수정한다.
-Ingest / Query / Lint 과정에서 수정 금지.
+이 파일은 카테고리 추가/변경 시에만 수동 수정한다. Ingest / Query / Lint 과정에서 수정 금지.
 
-이 파일이 L1 keywords/description의 **정본(SSOT)** 이다.
-memory/index.md 및 각 L1 _index.md의 keywords/description은 이 정본의 **파생물**이다.
-정본을 수정하면 파생본을 함께 갱신하며, Lint Step 2가 정본과 대조해 불일치 시 자동 교정한다.
-
-주의(완화이지 완전 SSOT 아님): Query Step 1은 경량 유지를 위해 여전히 파생본(memory/index.md)을
-읽으므로, Lint 사이에는 정본과 어긋나는 창이 남을 수 있다. 이는 lazy-loading을 위한
-의도적 trade-off이며, 정본 교정은 Lint 시점에 사후 수렴한다.
+> **중요 — keywords의 역할 변화**: v6.0에서 카테고리 `keywords`는 주제어가 아니라 **화행 신호**다.
+> 그리고 이는 **결정론적 라우팅 게이트가 아니라 LLM의 저장 분류 가이드**일 뿐이다. 인지유형 판단은
+> 저장 시 LLM이 화행으로 1회 수행하고(어차피 글을 읽으므로 추가 토큰 없음), 조회 라우팅은
+> 벡터 검색(`tools/query.mjs`)이 담당한다. 캐스케이드/키워드 게이트는 폐지됐다.
 
 ---
 
-## L1 카테고리 약어 레지스트리 (단일 출처)
+## L1 인지유형 약어 레지스트리 (단일 출처)
 
-ID 접두사 `{카테고리코드}`에 쓰이는 L1 약어의 **정본**이다. 약어는 여기서만 정의하며,
-다른 파일(ID, storage cross 판정 등)은 이 표를 참조한다.
+ID 접두사 `{인지유형약어}`의 **정본**이다. 약어는 여기서만 정의한다.
 
-| L1 경로 | 약어 |
-|---|---|
-| daily_life | dl |
-| learning | ln |
+| L1 경로 | 약어 | 핵심 질문 | 화행 신호(분류 가이드) | 특수 규칙 |
+|---|---|---|---|---|
+| episodic | ep | 언제 무슨 일이 있었나 | 했다·갔다·오늘·어제·만났다·봤다 | `origin: first_party`만 |
+| semantic | se | 이것은 무엇인가 | ~이다·~란·개념·정의·의미·원리 | — |
+| procedural | pr | 어떻게 하는가 | ~하는 법·먼저·그다음·절차·방법·단계 | — |
+| reflective | rf | 여러 경험서 무엇을 알았나 | 되돌아보면·깨달았다·패턴·교훈 | `related:` 필수, tags에 "reflective" |
+| thesis | th | 무엇을 주장하는가 | ~해야 한다·~라고 본다·입장·당위·평가 | `related:`(supports/contradicts) 권장 |
 
-새 L1 추가 시 필수:
-1. 이 표에 `경로 → 약어` 행을 추가한다.
-2. 기존 약어와 **충돌하지 않는지** 반드시 확인한다(약어는 L1 전역에서 유일해야 한다).
-3. 충돌 시 다른 약어를 택한다(예: language는 ln 충돌 → lang).
-
----
-
-## 작성 형식
-
-```markdown
-# {category_path}
-keywords: [키워드1, 키워드2, ...]   ← Step 1 Keyword Gate 매칭 대상
-포함: 이 카테고리에 저장해야 하는 내용
-제외: 이 카테고리에 저장하면 안 되는 내용 (다른 카테고리 명시)
-경계: 판단이 애매한 경우와 그 처리 방법
-```
+약어 ep/se/pr/rf/th는 전역 유일이다.
 
 ---
 
-## daily_life
+## 분류 기준 (포함/제외/경계)
 
-keywords: [일상, 생활, 하루, 오늘, 개인, 경험, 습관, 루틴]
-포함: 개인적인 일상생활 경험, 습관, 루틴, 감정 기록
-제외: 외부 지식, 논문, 체계적 학습 내용 → learning/
-경계: 일상에서 우연히 습득한 정보 → origin: curated, daily_life에 저장
+### episodic — 경험
+포함: 시간/장소가 있는 1인칭 경험. 무슨 일이 있었나.
+제외: 복수 경험을 종합한 메타 통찰 → reflective.
+경계: 단일 경험 + 짧은 감상은 episodic. `origin: first_party`만.
+
+### semantic — 개념
+포함: 세계에 대한 사실·개념·정의·원리.
+제외: 개인 경험 → episodic, 주장·평가 → thesis.
+경계: 외부 지식 + 의견 혼합은 semantic(`origin: curated`).
+
+### procedural — 방법
+포함: 절차·방법·수행 방식(단계적).
+제외: 개념 설명만 → semantic.
+경계: "무엇" 위주면 semantic, "어떻게" 위주면 procedural.
+
+### reflective — 통찰
+포함: 복수 경험/지식에서 도출한 메타 수준 통찰("되돌아보니 ~").
+제외: 단일 경험 + 감상 → episodic.
+경계: `related:` 근거 필수. 근거가 없으면 episodic/semantic으로 재분류(아래 다중신호 규칙).
+
+### thesis — 주장
+포함: 명시적 주장·입장·당위·평가("~해야 한다", "~라고 본다").
+제외: 사실 서술 → semantic.
+경계: 근거는 `related:`의 supports/contradicts로 연결(권장).
 
 ---
 
-## learning
+## 다중 화행 신호 처리
 
-keywords: [학습, 공부, 배움, 지식, 이해, 개념, 원리, 방법론]
-포함: 의도적으로 학습한 지식, 개념, 원리, 방법론
-제외: 단순 개인 경험, 감정 기록 → daily_life/
-경계: 학습 중 생긴 개인적 감상 → memory_type: reflective, learning에 저장
+한 입력이 여러 인지유형 신호를 가지면(예: "매일 운동했더니 꾸준함이 중요하다 싶다" = 경험+통찰):
+- 경험 부분은 episodic, 통찰 부분은 reflective로 **분해 저장**(각각 ID 발급).
+- reflective는 `related:` 필수이므로 분해된 episodic을 근거로 `synthesized` 엣지로 자동 연결한다
+  (다른 인지유형 간이므로 `memory/_graph.md` 크로스 엣지에도 기록).
+- 분해가 애매하면 지배적 신호로 단일 분류한다.
+- 이 분해는 storage가 수행한다(router 불변).
 
 ---
 
-## 새 카테고리 추가 시 주의사항
+## 새 인지유형 추가 (수동 · 사용자 확인)
 
-L1과 L2 이하는 절차가 다르다.
-
-### L1 신규 추가 (수동 · 사용자 확인)
-
-1. 기존 카테고리와 유사도 75% 미만으로 판단될 때만 추가
-2. 사용자 확인을 거쳐 추가 (자동 생성 금지)
-3. 약어 레지스트리에 `경로 → 약어` 등록 + 충돌 검사 (위 "L1 카테고리 약어 레지스트리")
-4. 추가 후 이 파일에 위 형식에 맞춰 기준 명문화
-5. 해당 카테고리 폴더 생성 및 _index.md, _graph.md 초기화
-6. memory/index.md에 L1 카테고리 항목 추가 (keywords 컬럼 포함, 이 파일의 keywords와 동일하게)
-
-### L2 이하 신규 추가 (자동 · 사후 통지)
-
-_rules/operations/storage_rules.md "Step 4 — leaf 도달 및 L2 이하 자동 생성"이 처리한다.
-
-1. 기존 하위와 유사도 75% 미만일 때만 자동 신설 (사용자 확인 불필요)
-2. 판단 기준은 이 파일이 아니라 각 _index.md 헤더(description/keywords)다 (L2 이하는
-   여기에 명문화하지 않는다)
-3. 폴더 + leaf _index.md(entry_count: 0) 생성, 필요 시 _graph.md 초기화
-4. 부모(중간노드) _index.md "## 하위 카테고리" 목록에 신규 leaf 행 추가 (없으면 섹션 신설)
-5. memory/log.md에 CATEGORY 이벤트 기록
+인지유형 5종은 고정 온톨로지다. 새 L1(인지유형) 추가는 자동으로 하지 않으며, 추가 시:
+1. 위 약어 레지스트리에 `경로 → 약어` 등록 + 충돌 검사.
+2. 분류 기준 명문화.
+3. `memory/<type>/_index.md` 초기화 + `memory/index.md`에 행 추가.
+4. `tools/lib/scan.mjs`의 `TYPES` 배열에 추가.

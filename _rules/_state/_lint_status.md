@@ -9,4 +9,4 @@ last_lint는 기록/감사용으로 유지하며, 트리거 판단에는 사용�
 ---
 
 last_lint: 2026-05-30T00:00:00
-ingest_since_lint: 1
+ingest_since_lint: 0
