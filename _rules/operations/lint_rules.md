@@ -31,6 +31,8 @@ node tools/lint.mjs --apply    # + memory/index.md 통계(entry_count·examples 
          (reindex_pending 백스톱도 여기서 해소)
 [index]  각 인지유형 entry_count·examples(centroid 최근접) 재산정 → memory/index.md 통계 섹션 (--apply)
 [check]  깨진 링크(related id 부재), 고아 파일(참조 0), reflective related 누락 리포트
+         (frontmatter related: + memory/_graph.md 크로스 엣지 양쪽 점검 → 끊긴 크로스 엣지=graph-broken-edge 탐지,
+          크로스로만 연결된 노드는 고아 오판정 제외)
 [near-miss] 임베딩 고유사 쌍(기본 ≥0.92) 중 related 없는 쌍을 중복 후보로 제시 (자동병합 금지)
 ```
 
