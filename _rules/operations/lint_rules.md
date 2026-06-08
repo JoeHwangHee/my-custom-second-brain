@@ -1,7 +1,9 @@
 # lint_rules.md — 정비 규칙 (v6.0 벡터 하이브리드)
 
-대부분의 정비를 `tools/lint.mjs`(결정론)로 이관한다. LLM은 리포트를 받아 **사용자 확인/판단**만
-한다(자동 병합·자동 frontmatter 수정 금지). edge/카테고리 수치는 활성 스키마 참조.
+읽기 정비(sync/통계/정합성리포트/near-miss)는 `tools/lint.mjs`(결정론)가, frontmatter/log/상태
+**변경**(co_occurrence 재산정·log 30일 정리·`_lint_status` 리셋)은 LLM이 수기로 담당한다.
+LLM은 `lint.mjs` 리포트를 받아 **사용자 확인/판단**을 하되, 자동 병합은 금지한다(§4·§5의 frontmatter/
+상태 변경은 lint.mjs가 수행하지 않으므로 LLM이 직접, 신중히 적용). edge/카테고리 수치는 활성 스키마 참조.
 
 ---
 
@@ -31,6 +33,8 @@ node tools/lint.mjs --apply    # + memory/index.md 통계(entry_count·examples 
          (reindex_pending 백스톱도 여기서 해소)
 [index]  각 인지유형 entry_count·examples(centroid 최근접) 재산정 → memory/index.md 통계 섹션 (--apply)
 [check]  깨진 링크(related id 부재), 고아 파일(참조 0), reflective related 누락 리포트
+         (frontmatter related: + memory/_graph.md 크로스 엣지 양쪽 점검 → 끊긴 크로스 엣지=graph-broken-edge 탐지,
+          크로스로만 연결된 노드는 고아 오판정 제외)
 [near-miss] 임베딩 고유사 쌍(기본 ≥0.92) 중 related 없는 쌍을 중복 후보로 제시 (자동병합 금지)
 ```
 
@@ -50,6 +54,8 @@ node tools/lint.mjs --apply    # + memory/index.md 통계(entry_count·examples 
 
 ## 4. link_strength 재산정 (co_occurrence)
 
+> (LLM 수행 — lint.mjs 미구현). 아래는 LLM이 직접 수행하는 frontmatter 변경 절차다.
+
 ```
 1. memory/log.md에서 마지막 LINT 이후 QUERY 엔트리의 accessed_file_ids 추출
 2. 각 쌍에 대해 한쪽 related: 에 상대 id가 있으면 co_occurrence_count += (함께 등장한 엔트리 수)
@@ -64,6 +70,8 @@ node tools/lint.mjs --apply    # + memory/index.md 통계(entry_count·examples 
 ---
 
 ## 5. log.md 정리 + 상태 갱신
+
+> (LLM 수행 — lint.mjs 미구현). lint.mjs는 log.md/_lint_status.md를 건드리지 않는다.
 
 ```
 memory/log.md: 30일 초과 항목 삭제 (LINT executed 최근 1건은 영구 보존)

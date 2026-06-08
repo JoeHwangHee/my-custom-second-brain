@@ -55,9 +55,3 @@ export async function embed(text) {
     return await callOnce(text); // 일시 오류 1회 재시도
   }
 }
-
-export async function embedBatch(texts) {
-  const out = [];
-  for (const t of texts) out.push(await embed(t)); // 소규모 코퍼스 순차
-  return out;
-}

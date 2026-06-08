@@ -79,9 +79,13 @@ episodic: origin: first_party만 허용.
 ```
 신규 related: 생성 시 link_strength = 활성 edge 스키마의 base_score, co_occurrence_count = 0.
 
-크로스 엣지(다른 인지유형 간만):
-  - 같은 인지유형 내 관계 → 각 파일 related: 로만 처리(graph 미기록).
-  - 다른 인지유형 간 → memory/_graph.md 에 행 추가: | from_id | to_id | edge_type | link_strength |
+크로스 엣지(다른 인지유형 간):
+  - 같은 인지유형 내 관계 → 각 파일 related: 에만 둔다(_graph.md 미기록).
+  - 다른 인지유형 간 → memory/_graph.md 에 행 추가(크로스 엣지 인덱스): | from_id | to_id | edge_type | link_strength |
+    · semantically 필요한 크로스 엣지(reflective 필수 synthesized→episodic, thesis supports/contradicts 근거)는
+      frontmatter related: 에도 둔다 — 즉 _graph.md는 크로스 엣지의 인덱스이지 배타적 저장소가 아니다.
+    · Lint(tools/lint.mjs)이 frontmatter related: 와 _graph.md 를 모두 읽어 정합성을 본다:
+      크로스로만 연결된 노드를 고아로 오판정하지 않고, 끊긴 크로스 엣지를 graph-broken-edge 로 탐지한다.
   (flat 구조라 같은 인지유형 내 L2 cross는 존재하지 않는다. per-type _graph.md 없음.)
 ```
 

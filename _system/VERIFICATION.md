@@ -79,7 +79,7 @@ end-to-end 검증.
 | 임베딩 파이프라인 | `index.mjs --all` → `query.mjs "운동"` | 3건 색인, score순 반환 **PASS** |
 | **직교 조회** | `query "운동"` vs `query "운동" --type th` | 전자=ep/se/th 3인지유형 전부, 후자=thesis만. **fan-out/RRF 없이 직교 해소 PASS** |
 | 관계 발견 | `query --related <ep>` | se(스쿼트 개념)가 1위(0.524) 자동 후보 **PASS** |
-| Lint 결정론 | `lint.mjs --apply` | entry_count(ep/se/th=1, pr/rf=0) 정확, examples=centroid 자동, orphan 리포트 **PASS** |
+| Lint 결정론 | `lint.mjs --apply` | entry_count(ep/se/th=1, pr/rf=0) 정확, examples=centroid 자동, 끊긴 링크/크로스엣지 리포트 **PASS** |
 | 삭제+prune | se 파일 삭제 → `index --prune` | 고아 1건 제거, 검색에서 소멸 **PASS** |
 | **이식성** | `.index` 삭제 → `index --all` 재생성 | markdown(SSOT)만으로 동일 결과 복원 **PASS** |
 | 정적 청결성 | grep | memory_type/daily_life/learning/dl-health 실사용 0(DESIGN v5 이력 제외), edge 수치 operation 하드코딩 0, ingest_since_lint 0, 경로 실재 **PASS** |

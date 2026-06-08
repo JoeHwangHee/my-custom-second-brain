@@ -139,7 +139,7 @@ content_lang: ko
 
 - _system/MEMORY.md, _system/router.md, _rules/operations/*.md 는 작업 중 수정하지 않는다.
 - edge/카테고리 수치는 `_rules/edges/edge_schema.md`·`category_schema.md`(활성 스키마)에만 둔다(operation 하드코딩 금지).
-- 같은 인지유형 내 관계는 파일 `related:`로, **다른 인지유형 간만** `memory/_graph.md`에 저장한다.
+- 같은 인지유형 내 관계는 각 파일 `related:`에만 둔다(`_graph.md` 미기록). 다른 인지유형 간(크로스) 관계는 `memory/_graph.md`에 인덱싱한다. reflective의 필수 `synthesized`(→episodic 근거)·thesis의 supports/contradicts처럼 frontmatter `related:`에도 필요한 크로스 엣지는 양쪽에 둔다(`_graph.md`는 크로스 엣지 인덱스이지 배타적 저장소가 아니다). Lint은 두 위치를 모두 읽어 정합성을 본다(고아 오판정 방지·끊긴 크로스 엣지 탐지).
 - 신규 related 생성 시 co_occurrence_count=0, link_strength=base_score로 초기화한다.
 - 인지유형(L1) 신규 생성은 자동으로 하지 않는다(고정 온톨로지, 사용자 확인 + scan.mjs TYPES 갱신).
 - 저장 직후 반드시 `tools/index.mjs --file`로 벡터 색인한다(실패 시 reindex_pending).

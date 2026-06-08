@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { rmSync, mkdtempSync } from 'node:fs';
-import { openDb, upsertItem, search, deleteById, pruneMissing, getEmbeddingById } from '../lib/db.mjs';
+import { openDb, upsertItem, search, pruneMissing, getEmbeddingById, existingHashes, updateItemMeta } from '../lib/db.mjs';
 import { DIM } from '../lib/embed.mjs';
 
 // 단위 기저 벡터 (정규화됨)
@@ -58,15 +58,48 @@ test('upsert 중복 id 갱신(중복행 없음)', () => {
   }
 });
 
-test('deleteById + getEmbeddingById', () => {
+test('getEmbeddingById', () => {
   const { dir, path } = tmpDbPath();
   const db = openDb(path);
   try {
     upsertItem(db, mkItem('a'), unit(0));
-    assert.ok(getEmbeddingById(db, 'a'));
-    assert.equal(deleteById(db, 'a'), true);
-    assert.equal(getEmbeddingById(db, 'a'), null);
-    assert.equal(search(db, unit(0), 10).length, 0);
+    const emb = getEmbeddingById(db, 'a');
+    assert.ok(Array.isArray(emb) && emb.length === DIM); // 색인된 id → 임베딩 복원
+    assert.equal(getEmbeddingById(db, 'zzz'), null); // 미존재 id → null
+  } finally {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('existingHashes: id→hash 맵 반환', () => {
+  const { dir, path } = tmpDbPath();
+  const db = openDb(path);
+  try {
+    upsertItem(db, { ...mkItem('a'), hash: 'h-a' }, unit(0));
+    upsertItem(db, { ...mkItem('b'), hash: 'h-b' }, unit(1));
+    const m = existingHashes(db);
+    assert.equal(m.get('a'), 'h-a');
+    assert.equal(m.get('b'), 'h-b');
+    assert.equal(m.get('zzz'), undefined); // 미존재 id
+  } finally {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('updateItemMeta: 임베딩 불변, 메타만 갱신', () => {
+  const { dir, path } = tmpDbPath();
+  const db = openDb(path);
+  try {
+    upsertItem(db, { ...mkItem('a'), hash: 'h1', title: 't1' }, unit(0));
+    const before = getEmbeddingById(db, 'a');
+    updateItemMeta(db, { ...mkItem('a'), hash: 'h2', title: 't2' });
+    // 메타 갱신됨
+    assert.equal(existingHashes(db).get('a'), 'h2');
+    assert.equal(search(db, unit(0), 10)[0].title, 't2');
+    // 임베딩은 그대로(vec_items 미변경)
+    assert.deepEqual(getEmbeddingById(db, 'a'), before);
   } finally {
     db.close();
     rmSync(dir, { recursive: true, force: true });

@@ -56,15 +56,18 @@ export function upsertItem(db, item, embedding) {
   return tx();
 }
 
-export function deleteById(db, id) {
-  const row = db.prepare('SELECT rowid FROM items WHERE id = ?').get(id);
-  if (!row) return false;
-  const tx = db.transaction(() => {
-    db.prepare('DELETE FROM items WHERE rowid=?').run(row.rowid);
-    db.prepare('DELETE FROM vec_items WHERE rowid=?').run(BigInt(row.rowid));
-  });
-  tx();
-  return true;
+// id→hash 맵 (변경 없는 항목의 재임베딩 skip 판단용)
+export function existingHashes(db) {
+  const rows = db.prepare('SELECT id, hash FROM items').all();
+  return new Map(rows.map((r) => [r.id, r.hash]));
+}
+
+// 메타데이터만 갱신(임베딩 불변 시). vec_items는 건드리지 않는다 → Ollama 왕복 없음.
+export function updateItemMeta(db, item) {
+  const tags = Array.isArray(item.tags) ? item.tags.join(',') : item.tags || '';
+  db.prepare(
+    'UPDATE items SET path=?,title=?,type=?,tags=?,origin=?,date=?,hash=? WHERE id=?'
+  ).run(item.path, item.title, item.type, tags, item.origin, item.date, item.hash, item.id);
 }
 
 // KNN 검색: embedding으로 상위 k개. score = 1 - cosine_distance.
@@ -135,8 +138,4 @@ export function getEmbeddingById(db, id) {
     )
     .get(id);
   return row ? JSON.parse(row.emb) : null;
-}
-
-export function listItems(db) {
-  return db.prepare('SELECT id, path, type FROM items').all();
 }
