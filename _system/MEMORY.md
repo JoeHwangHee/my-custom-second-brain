@@ -18,8 +18,8 @@
 
 ## 핵심 원칙
 - Lazy Loading: 각 단계마다 필요한 파일만 순차 로드
-- 분할 기준: _index.md 50건 / _graph.md 100건
-- 크로스 카테고리 관계만 _graph.md에 저장
+- 관계: 같은 인지유형 내는 frontmatter related:, 인지유형 간 크로스는 memory/_graph.md에 인덱싱
+- 크로스 엣지는 frontmatter related:와 _graph.md에 병기(배타 저장 아님). flat 구조라 L2 자동분할 없음
 
 ---
 이 파일은 초기 1회 작성 후 수정 금지.

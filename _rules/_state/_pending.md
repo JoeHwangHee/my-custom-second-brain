@@ -6,7 +6,7 @@ Lint가 항목을 추가하며 블로킹 없이 계속 진행한다.
 사용자가 처리 완료한 항목은 이 파일에서 삭제한다.
 
 항목 형식:
-  - type: split_proposal | graph_split_proposal | new_category_proposal
+  - type: new_category_proposal
     category: {대상 경로}
     detected: {감지 시각}
     suggested: [{제안 내용}]
