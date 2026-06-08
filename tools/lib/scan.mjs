@@ -12,6 +12,11 @@ export const DB_PATH = join(ROOT, 'tools', '.index', 'brain.db');
 // flat 구조: 인지유형은 폴더가 아니라 frontmatter category_path로만 식별한다.
 export const TYPES = ['episodic', 'semantic', 'procedural', 'reflective', 'thesis'];
 
+// 인지유형(L1) 추출: flat 구조라 `/`는 없지만 과거 경로 호환을 위해 첫 토막만 취한다.
+export function typeOf(data) {
+  return String(data?.category_path || '').split('/')[0] || '';
+}
+
 // memory/ 직속의 frontmatter.id 가 있는 Thought 파일만 반환 (flat)
 export function thoughtFiles() {
   const out = [];
@@ -34,7 +39,11 @@ export function graphEdges(path = join(MEMORY_DIR, '_graph.md')) {
   for (const line of readFileSync(path, 'utf8').split('\n')) {
     const t = line.trim();
     if (!t.startsWith('|')) continue;
-    const cells = t.split('|').slice(1, -1).map((c) => c.trim());
+    // 끝 `|`는 markdown 표에서 선택사항 → 선행/후행 빈 토큰만 제거(누락 방지).
+    const parts = t.split('|');
+    if (parts[0].trim() === '') parts.shift();
+    if (parts.length && parts[parts.length - 1].trim() === '') parts.pop();
+    const cells = parts.map((c) => c.trim());
     if (cells.length < 4) continue;
     const [from, to, edge_type, link_strength] = cells;
     if (from === 'from_id' || /^-+$/.test(from) || !from || !to) continue;

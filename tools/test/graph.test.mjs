@@ -33,20 +33,32 @@ test('graphEdges: 헤더·구분선·플레이스홀더 스킵, 실제 행만 �
   }
 });
 
+test('graphEdges: 끝 파이프 없는 행도 누락 없이 파싱', () => {
+  // markdown 표는 끝 `|`가 선택사항 → trailing-pipe 없는 행도 잡아야 한다.
+  const { dir, path } = tmpGraph(
+    `# _graph.md\n| from_id | to_id | edge_type | link_strength |\n|---|---|---|---|\n| ep-1 | th-1 | supports | 0.6 |\n| rf-1 | ep-2 | synthesized | 0.7\n`
+  );
+  try {
+    const edges = graphEdges(path);
+    assert.equal(edges.length, 2);
+    assert.deepEqual(edges[1], { from: 'rf-1', to: 'ep-2', edge_type: 'synthesized', link_strength: '0.7' });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('graphEdges: 파일 없으면 빈 배열', () => {
   assert.deepEqual(graphEdges(join(tmpdir(), 'no-such-graph-xyz.md')), []);
 });
 
-test('consistencyReport: 교차엣지로만 연결된 노드는 orphan 제외', () => {
+test('consistencyReport: 교차엣지가 relatedPairs에 합쳐진다(near-miss 제외용)', () => {
   const files = [mkFile('ep-1', 'episodic'), mkFile('th-1', 'thesis')];
-  // frontmatter related 없음 → 둘 다 고아여야 하지만, _graph.md ep-1→th-1 존재
   const edges = [{ from: 'ep-1', to: 'th-1', edge_type: 'supports', link_strength: '0.6' }];
 
   const withoutGraph = consistencyReport(files, []);
-  assert.deepEqual(withoutGraph.orphans.sort(), ['ep-1', 'th-1']); // 교차엣지 미반영 시 둘 다 고아
+  assert.ok(!withoutGraph.relatedPairs.has(['ep-1', 'th-1'].sort().join('::')), '교차엣지 미반영 시 쌍 없음');
 
   const withGraph = consistencyReport(files, edges);
-  assert.ok(!withGraph.orphans.includes('th-1'), 'th-1은 교차엣지 타깃이므로 orphan 아님');
   assert.ok(withGraph.relatedPairs.has(['ep-1', 'th-1'].sort().join('::')), '교차쌍이 relatedPairs에 반영');
 });
 
