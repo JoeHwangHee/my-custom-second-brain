@@ -56,17 +56,6 @@ export function upsertItem(db, item, embedding) {
   return tx();
 }
 
-export function deleteById(db, id) {
-  const row = db.prepare('SELECT rowid FROM items WHERE id = ?').get(id);
-  if (!row) return false;
-  const tx = db.transaction(() => {
-    db.prepare('DELETE FROM items WHERE rowid=?').run(row.rowid);
-    db.prepare('DELETE FROM vec_items WHERE rowid=?').run(BigInt(row.rowid));
-  });
-  tx();
-  return true;
-}
-
 // KNN 검색: embedding으로 상위 k개. score = 1 - cosine_distance.
 export function search(db, embedding, k = 40) {
   const rows = db
@@ -135,8 +124,4 @@ export function getEmbeddingById(db, id) {
     )
     .get(id);
   return row ? JSON.parse(row.emb) : null;
-}
-
-export function listItems(db) {
-  return db.prepare('SELECT id, path, type FROM items').all();
 }

@@ -39,7 +39,7 @@ node query.mjs --related <file|id>   # 유사 후보 (관계 발견; Ingest 직�
 
 # 정비 (결정론)
 node lint.mjs            # 동기화 + 정합성/near-miss 리포트 (자동수정 없음)
-node lint.mjs --apply    # + _index.md entry_count·examples(centroid) 기록
+node lint.mjs --apply    # + memory/index.md 통계 섹션 entry_count·examples(centroid) 기록
 ```
 
 ## 환경 변수

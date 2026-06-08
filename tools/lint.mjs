@@ -2,6 +2,7 @@
 // lint.mjs — 결정론 정비: 벡터동기화·entry_count·examples(centroid)·near-miss·깨진링크
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { embedText } from './lib/frontmatter.mjs';
 import { embed } from './lib/embed.mjs';
@@ -12,7 +13,7 @@ import {
   typeEmbeddings,
   allEmbeddings,
 } from './lib/db.mjs';
-import { ROOT, MEMORY_DIR, DB_PATH, TYPES, thoughtFiles } from './lib/scan.mjs';
+import { ROOT, MEMORY_DIR, DB_PATH, TYPES, thoughtFiles, graphEdges } from './lib/scan.mjs';
 
 const has = (f) => process.argv.includes(f);
 function arg(f, d) {
@@ -99,7 +100,7 @@ function nearMissCandidates(db, threshold, relatedPairs) {
   return out.sort((x, y) => y.sim - x.sim);
 }
 
-function consistencyReport(files) {
+export function consistencyReport(files, edges = []) {
   const ids = new Set(files.map((f) => f.data.id));
   const broken = [];
   const reflectiveNoRel = [];
@@ -116,8 +117,17 @@ function consistencyReport(files) {
       if (!ids.has(r.id)) broken.push({ from: f.data.id, to: r.id });
     }
   }
+  // 크로스(L1 간) 엣지: _graph.md에만 기록되므로 frontmatter와 별도로 반영해야
+  // 오판정(false-positive orphan)·미탐지(끊긴 엣지)를 막는다.
+  const graphBroken = [];
+  for (const e of edges) {
+    if (!e || !e.from || !e.to) continue;
+    relatedPairs.add([e.from, e.to].sort().join('::'));
+    referenced.add(e.to);
+    if (!ids.has(e.from) || !ids.has(e.to)) graphBroken.push({ from: e.from, to: e.to });
+  }
   const orphans = [...ids].filter((id) => !referenced.has(id));
-  return { broken, reflectiveNoRel, orphans, relatedPairs };
+  return { broken, reflectiveNoRel, orphans, relatedPairs, graphBroken };
 }
 
 async function main() {
@@ -146,8 +156,9 @@ async function main() {
     if (apply) updateStatsSection(stats);
 
     // 3) 정합성 리포트 (자동수정 금지 — 사용자 확인용)
-    const { broken, reflectiveNoRel, orphans, relatedPairs } = consistencyReport(files);
+    const { broken, reflectiveNoRel, orphans, relatedPairs, graphBroken } = consistencyReport(files, graphEdges());
     if (broken.length) console.log(`[broken-link] ${broken.map((b) => `${b.from}→${b.to}`).join(', ')}`);
+    if (graphBroken.length) console.log(`[graph-broken-edge] ${graphBroken.map((b) => `${b.from}→${b.to}`).join(', ')}`);
     if (reflectiveNoRel.length) console.log(`[reflective-no-related] ${reflectiveNoRel.join(', ')}`);
     if (orphans.length) console.log(`[orphan] ${orphans.join(', ')}`);
 
@@ -155,13 +166,16 @@ async function main() {
     const nm = nearMissCandidates(db, threshold, relatedPairs);
     if (nm.length) console.log(`[near-miss 후보] ${nm.map((p) => `${p.a}~${p.b}(${p.sim})`).join(', ')}`);
 
-    if (!broken.length && !reflectiveNoRel.length && !nm.length) console.log('[ok] 정합성 이상 없음');
+    if (!broken.length && !graphBroken.length && !reflectiveNoRel.length && !nm.length) console.log('[ok] 정합성 이상 없음');
   } finally {
     db.close();
   }
 }
 
-main().catch((e) => {
-  console.error(String(e.message || e));
-  process.exit(1);
-});
+// 직접 실행 시에만 main() 구동(테스트가 consistencyReport를 import할 때 부작용 방지)
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch((e) => {
+    console.error(String(e.message || e));
+    process.exit(1);
+  });
+}

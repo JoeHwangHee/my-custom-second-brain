@@ -1,7 +1,7 @@
 // scan.mjs — 저장소 경로 상수 + Thought 파일 스캔(flat 인지유형 트리)
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { parseFile } from './frontmatter.mjs';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -22,6 +22,23 @@ export function thoughtFiles() {
     const { data, body } = parseFile(path);
     if (!data || !data.id) continue;
     out.push({ path, data, body });
+  }
+  return out;
+}
+
+// memory/_graph.md 의 파이프 테이블에서 크로스(L1 간) 엣지 행 파싱.
+// 헤더/구분선/플레이스홀더(from_id) 행은 건너뛴다.
+export function graphEdges(path = join(MEMORY_DIR, '_graph.md')) {
+  if (!existsSync(path)) return [];
+  const out = [];
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const t = line.trim();
+    if (!t.startsWith('|')) continue;
+    const cells = t.split('|').slice(1, -1).map((c) => c.trim());
+    if (cells.length < 4) continue;
+    const [from, to, edge_type, link_strength] = cells;
+    if (from === 'from_id' || /^-+$/.test(from) || !from || !to) continue;
+    out.push({ from, to, edge_type, link_strength });
   }
   return out;
 }
