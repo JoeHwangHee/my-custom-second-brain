@@ -11,26 +11,31 @@ bge-m3 + sqlite-vec)가 결정론적으로 수행하고, LLM은 인지유형 분
 
 디렉토리:
 `_system/`(엔진) · `_rules/`(규칙 — operations/categories/edges/_state) · `memory/`(실메모리) ·
-`tools/`(임베딩 인덱싱·조회 CLI). `CLAUDE.md`만 루트에 고정된다(자동 로드 부트스트랩).
+`tools/`(임베딩 인덱싱·조회 CLI) · `.claude/`(운영 인터페이스 — 슬래시 명령·haiku 서브에이전트).
+`CLAUDE.md`만 루트에 고정된다(자동 로드 부트스트랩).
 
 ---
 
-## 대화 시작 시 필수 절차 (순서 고정)
+## 4대 작업 — 슬래시 명령으로 위임
 
-```
-1. _rules/_state/_pending.md 확인
-   → 미결 항목(split/reflective/reindex 등) 존재 시 사용자에게 먼저 안내 → 처리 후 복귀
+4대 작업(저장·조회·삭제·정리)은 슬래시 명령으로 진입한다. 무거운 규칙(router·operations·스키마
+전문)은 메인이 로드하지 않고 각 **haiku 서브에이전트**(`.claude/agents/sb-*.md`)가 보유한다 —
+메인은 명령 1개와 결과 요약만 부담한다(토큰 효율).
 
-2. _system/router.md 로드 → 5단계 파이프라인으로 입력 의도 분기
+| 작업 | 명령 | 서브에이전트 | 메인의 최소 전처리 |
+|---|---|---|---|
+| 저장 | `/sb-ingest <내용>` | sb-ingest | 내용 전달 |
+| 조회 | `/sb-query <질의>` | sb-query | 지시대명사 해소·subject 정규화 |
+| 삭제 | `/sb-delete <대상>` | sb-delete | 대상 특정(모호 시 사용자 확인) |
+| 정비 | `/sb-lint [--apply]` | sb-lint | 없음 |
+| 미결 | `/sb-pending` | sb-pending | 없음 |
 
-3. 의도 확정 후 해당 규칙 파일로 이동
-   Ingest → _rules/operations/storage_rules.md
-   Query  → _rules/operations/query_rules.md  (→ node tools/query.mjs 호출)
-   Delete → _rules/operations/delete_rules.md
-   Lint   → _rules/_state/_lint_status.md 확인 후 _rules/operations/lint_rules.md
-```
+세션 시작 시 `_rules/_state/_pending.md`를 확인한다. 미결 항목(reindex_pending·reflective_pending·
+new_category_proposal)이 있으면 **비차단 안내**한다 — "미결 N건, `/sb-pending` 권장"만 알리고 본
+작업은 막지 않는다(처리 시점은 사용자 재량).
 
-_system/MEMORY.md는 참조가 필요할 때만 로드한다.
+규칙 정본은 `_system/router.md`·`_rules/operations/*.md`·스키마(불변)에 그대로 있다. 슬래시 명령은
+새 실행 경로일 뿐 정본을 대체하지 않는다. `_system/MEMORY.md`는 참조가 필요할 때만 로드한다.
 
 ---
 
@@ -47,44 +52,12 @@ _system/MEMORY.md는 참조가 필요할 때만 로드한다.
 
 ---
 
-## 작업별 파일 로드 순서
+## 메모리 물리 구조
 
-실메모리의 물리 루트는 `memory/`다. 모든 Thought는 `memory/` 직속에 둔다(폴더 없음; 인지유형은 `category_path`로 식별).
-
-### Ingest (저장)
-```
-_system/router.md → _rules/operations/storage_rules.md
-→ 활성 스키마(_rules/categories/_active.md)로 인지유형(L1) 화행 판단 (다중신호면 분해)
-→ Thought 파일 생성 (id={약어}-{YYYYMMDD}-{순번}, category_path=인지유형, memory_type 없음)
-→ 활성 edge 스키마(_rules/edges/_active.md)로 related link_strength 초기화
-→ node tools/index.mjs --file <경로>   (실패 시 _pending reindex_pending)
-→ node tools/query.mjs --related <경로> → 관계후보 검토 → edge_type 선택 연결
-→ (다른 인지유형 간) memory/_graph.md 엣지  (통계는 Lint가 memory/index.md에 재산정)
-→ _rules/_state/_lint_status.md ingest_since_lint+1 → memory/log.md INGEST
-```
-
-### Query (조회)
-```
-_system/router.md → _rules/operations/query_rules.md
-→ node tools/query.mjs "<subject>" [--type <인지유형>] [--tag <주제>] --json
-→ 반환 후보(path)만 로드  (탐색 경로 밖 로드 금지)
-→ [필요 시] edge graph_score 재순위 / memory/_graph.md
-→ memory/log.md QUERY (accessed_file_ids)
-```
-
-### Delete (삭제)
-```
-_system/router.md → _rules/operations/delete_rules.md
-→ 대상 frontmatter(category_path, related) → 역참조 / _graph.md 정리  (통계는 Lint)
-→ 파일 삭제 → node tools/index.mjs --prune → memory/log.md DELETE
-```
-
-### Lint (정비)
-```
-_rules/_state/_lint_status.md (트리거: ingest_since_lint≥50 또는 명시 명령)
-→ _rules/operations/lint_rules.md → node tools/lint.mjs [--apply]
-→ 리포트(깨진링크/near-miss/reflective누락) 사용자 확인 → 상태 갱신·log
-```
+실메모리의 물리 루트는 `memory/`다. 모든 Thought는 `memory/` 직속에 둔다(폴더 없음; 인지유형은
+`category_path`로 식별). 각 작업의 상세 절차는 해당 서브에이전트 정의(`.claude/agents/sb-*.md`)와
+정본 규칙(`_rules/operations/*.md`)에 있다. 삭제 정합성 보정(역참조·크로스 엣지·고아 벡터 prune·
+log)은 결정론 스크립트 `tools/delete.mjs`가 전담한다.
 
 ---
 
@@ -98,13 +71,14 @@ _rules/_state/_lint_status.md (트리거: ingest_since_lint≥50 또는 명시 �
 | _rules/operations/*.md | 수정 금지 |
 | _rules/categories/category_schema.md, _active.md | 수동만 |
 | _rules/edges/edge_schema.md, _active.md | 수동만 (edge 온톨로지 변경 시) |
-| tools/** (코드) | 수동만 (CLI 변경 시). tools/.index/ 는 CLI가 생성(파생물) |
+| .claude/agents/*, .claude/commands/* | 수동만 (서브에이전트·슬래시 명령 정의) |
+| tools/** (코드) | 수동만 (CLI 변경 시; delete.mjs 포함). tools/.index/ 는 CLI가 생성(파생물) |
 | memory/index.md | 수동 (인지유형 목록), Lint (통계 섹션 entry_count·examples 자동 갱신) |
-| memory/_graph.md | Ingest (크로스 엣지), Lint |
+| memory/_graph.md | Ingest (크로스 엣지), Delete (역참조·크로스 정리, delete.mjs), Lint |
 | memory/log.md | Ingest/Query/Delete/Lint (각 이벤트) |
 | _rules/_state/_lint_status.md | Ingest (카운트+1), Lint (갱신) |
-| _rules/_state/_pending.md | Ingest (reindex_pending), Lint (split 등), 수동 (처리 후 삭제) |
-| Thought 파일 | Ingest (생성), Delete (삭제), Lint (frontmatter 갱신) |
+| _rules/_state/_pending.md | Ingest (reindex_pending/reflective_pending), Lint (new_category_proposal 등), sb-pending (자동분 제거), 수동 (처리 후 삭제) |
+| Thought 파일 | Ingest (생성), Delete (삭제·역참조 정리), Lint (frontmatter 갱신) |
 
 ---
 
