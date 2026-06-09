@@ -37,6 +37,10 @@ node query.mjs "<쿼리>" [--type ep,rf] [--tag 운동] [--topk 8] [--json]
 node query.mjs --related <file|id>   # 유사 후보 (관계 발견; Ingest 직후 edge 후보)
 #   --type: 인지유형 필터(ep/se/pr/rf/th 또는 풀네임). --tag: 주제 태그. 둘은 독립 필터.
 
+# 삭제 (결정론)
+node delete.mjs <id|path> [--json]   # 역참조·크로스엣지(_graph.md)·고아벡터 정리 + log DELETE
+#   대상 미발견 시 삭제하지 않고 exit 1. 모든 Thought 순회로 비대칭 역참조까지 제거.
+
 # 정비 (결정론)
 node lint.mjs            # 동기화 + 정합성/near-miss 리포트 (자동수정 없음)
 node lint.mjs --apply    # + memory/index.md 통계 섹션 entry_count·examples(centroid) 기록
